@@ -2,6 +2,7 @@
 #include "events/TouchEvent.hpp"
 #include "events/Event.hpp"
 #include "events/KeyboardEvent.hpp"
+#include "events/Keyboard.hpp"
 #include <iostream>
 #include "utils/Logger.hpp"
 
@@ -154,7 +155,11 @@ namespace platform {
                      keyboardEvent->getAltKey() ? " [Alt]" : "",
                      keyboardEvent->getShiftKey() ? " [Shift]" : "");
         
-        // 派发事件到舞台
+        // 更新全局键盘状态
+        egret::getKeyboard().setKeyDown(keyboardEvent->getKeyCode(), sdlEvent.type == SDL_EVENT_KEY_DOWN);
+        egret::getKeyboard().setModifiers(keyboardEvent->getCtrlKey(), keyboardEvent->getAltKey(), keyboardEvent->getShiftKey());
+
+        // 派发事件到舞台（事件流）
         bool result = m_stage->dispatchEvent(*keyboardEvent);
         
         return result;
@@ -209,6 +214,7 @@ namespace platform {
         // 在这里可以添加坐标系转换逻辑
         // 比如处理不同的缩放模式、DPI缩放等
         // 暂时保持原样
+        // TODO
     }
 
 } // namespace platform
