@@ -5,6 +5,7 @@
 #include <vector>
 
 namespace egret {
+    class DisplayObject;  // 前向声明
 namespace sys {
     // 前向声明
     class RenderBuffer;
@@ -90,9 +91,20 @@ namespace sys {
          */
         bool hasClipRect() const { return m_hasClipRect; }
         
+        /**
+         * 设置根显示对象
+         */
+        void setRoot(DisplayObject* root) { m_root = root; }
+        
+        /**
+         * 获取根显示对象
+         */
+        DisplayObject* getRoot() const { return m_root; }
+        
     private:
         std::shared_ptr<RenderNode> m_renderNode;
         std::shared_ptr<RenderBuffer> m_renderBuffer;
+        DisplayObject* m_root = nullptr;  // 根显示对象
         bool m_dirty = false;
         
         // 剪裁矩形相关

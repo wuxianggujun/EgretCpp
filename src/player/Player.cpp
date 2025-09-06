@@ -1,12 +1,15 @@
 #include "player/Player.hpp"
 #include "player/SystemTicker.hpp"
 #include "player/SkiaRenderBuffer.hpp"
+#include "player/SystemRenderer.hpp"
 #include "display/Stage.hpp"
 #include "display/DisplayList.hpp"
 #include "events/Event.hpp"
+#include "utils/Logger.hpp"
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include <vector>
 
 namespace egret {
 namespace sys {
@@ -24,11 +27,71 @@ namespace sys {
         // 初始化SDL（如果还未初始化）
         static bool sdlInitialized = false;
         if (!sdlInitialized) {
-            if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0) {
-                throw std::runtime_error(std::string("Failed to initialize SDL: ") + SDL_GetError());
+            EGRET_INFO("Player: 开始初始化SDL...");
+            
+            // 初始化全局渲染器
+            sys::initializeRenderers();
+            EGRET_INFO("Player: Skia渲染器初始化完成");
+            
+            // 清除之前的SDL错误状态
+            SDL_ClearError();
+            
+            // 首先尝试初始化视频子系统
+            EGRET_DEBUG("Player: 调用SDL_Init(SDL_INIT_VIDEO)...");
+            bool result = SDL_Init(SDL_INIT_VIDEO);
+            EGRET_DEBUGF("Player: SDL_Init返回值: {}", result ? "true (success)" : "false (failed)");
+            
+            if (!result) {
+                const char* sdlError = SDL_GetError();
+                std::string errorDetails = sdlError ? std::string(sdlError) : "Unknown SDL error";
+                
+                // 尝试获取更详细的错误信息
+                if (errorDetails.empty() || errorDetails == "Unknown SDL error") {
+                    errorDetails = "SDL initialization failed - possible causes: missing graphics drivers, insufficient permissions, or corrupted SDL installation";
+                }
+                
+                std::string errorMsg = std::string("Failed to initialize SDL VIDEO: ") + errorDetails;
+                EGRET_ERRORF("Player: SDL视频子系统初始化失败: 返回码={}, 错误={}", result ? "success" : "failed", errorDetails);
+                
+                // 尝试不同的初始化策略 - SDL3中使用多个标志位组合
+                EGRET_INFO("Player: 尝试初始化基本SDL子系统...");
+                SDL_ClearError();
+                // SDL3中需要显式指定各个子系统
+                Uint32 initFlags = SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_AUDIO;
+                bool fallbackResult = SDL_Init(initFlags);
+                if (!fallbackResult) {
+                    const char* fallbackError = SDL_GetError();
+                    EGRET_ERRORF("Player: 基本SDL初始化也失败: 返回码={}, 错误={}", fallbackResult ? "success" : "failed", fallbackError ? fallbackError : "Unknown error");
+                    throw std::runtime_error(errorMsg);
+                } else {
+                    EGRET_INFO("Player: SDL基本子系统初始化成功（作为后备方案）");
+                }
+            } else {
+                EGRET_INFO("Player: SDL视频子系统初始化成功");
             }
+            
+            // 然后尝试初始化事件子系统
+            if (!SDL_InitSubSystem(SDL_INIT_EVENTS)) {
+                std::string errorMsg = std::string("Failed to initialize SDL EVENTS: ") + SDL_GetError();
+                EGRET_WARN("Player: SDL事件子系统初始化失败: " + errorMsg);
+                // 事件子系统失败不算严重错误，继续运行
+            } else {
+                EGRET_INFO("Player: SDL事件子系统初始化成功");
+            }
+            
+            // 最后尝试初始化音频子系统（可选）
+            if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
+                std::string errorMsg = std::string("Failed to initialize SDL AUDIO: ") + SDL_GetError();
+                EGRET_WARN("Player: SDL音频子系统初始化失败（可忽略）: " + errorMsg);
+                // 音频子系统失败不算严重错误，继续运行
+            } else {
+                EGRET_INFO("Player: SDL音频子系统初始化成功");
+            }
+            
             sdlInitialized = true;
-            std::cout << "SDL initialized by Player" << std::endl;
+            EGRET_INFO("Player: SDL初始化完成");
+        } else {
+            EGRET_DEBUG("Player: SDL已经初始化过了");
         }
         
         // 创建SDL窗口
@@ -51,7 +114,7 @@ namespace sys {
         // 创建事件转换器
         m_eventConverter = std::make_shared<platform::SDLEventConverter>(m_stage);
         
-        std::cout << "Player created with SDL window: " << width << "x" << height << " - " << title << std::endl;
+        EGRET_INFOF("Player已创建，SDL窗口: {}x{} - {}", width, height, title);
     }
 
     // 传统构造函数（兼容现有代码）
@@ -99,7 +162,7 @@ namespace sys {
         auto sharedThis = std::enable_shared_from_this<Player>::shared_from_this();
         getTicker().addPlayer(sharedThis);
         
-        std::cout << "Player started with entry class: " << m_entryClassName << std::endl;
+        EGRET_INFOF("Player started with entry class: {}", m_entryClassName);
     }
     
     void Player::initialize() {
@@ -108,12 +171,12 @@ namespace sys {
             m_root = m_entryClassFactory();
             if (m_root) {
                 m_stage->addChild(m_root.get());
-                std::cout << "Entry class instance created and added to stage" << std::endl;
+                EGRET_INFO("Entry class instance created and added to stage");
             } else {
-                std::cerr << "Failed to create entry class instance" << std::endl;
+                EGRET_ERROR("Failed to create entry class instance");
             }
         } else {
-            std::cout << "No entry class factory provided" << std::endl;
+            EGRET_DEBUG("No entry class factory provided");
         }
     }
     
@@ -134,13 +197,15 @@ namespace sys {
         auto sharedThis = std::enable_shared_from_this<Player>::shared_from_this();
         getTicker().removePlayer(sharedThis);
         
-        std::cout << "Player paused" << std::endl;
+        EGRET_INFO("Player paused");
     }
     
     void Player::render(bool triggerByFrame, int costTicker) {
         if (!m_stage) {
             return;
         }
+        
+        EGRET_DEBUGF("Player::render() started - triggerByFrame={}, costTicker={}", triggerByFrame, costTicker);
         
         // 记录渲染开始时间
         auto startTime = std::chrono::high_resolution_clock::now();
@@ -158,8 +223,15 @@ namespace sys {
         //     egret.sys.systemRenderer.renderClear();
         // }
         
+        EGRET_DEBUG("Player::render() - Calling Stage::buildRenderContent()");
+        // 首先构建渲染内容，确保DisplayList的root被正确设置
+        m_stage->buildRenderContent();
+        
+        EGRET_DEBUG("Player::render() - Calling DisplayList::drawToSurface()");
         // 执行显示列表绘制
         int drawCalls = m_stage->getDisplayList()->drawToSurface();
+        
+        EGRET_DEBUGF("Player::render() - DrawCalls completed: {}", drawCalls);
         
         // 记录渲染结束时间
         auto endTime = std::chrono::high_resolution_clock::now();
@@ -194,7 +266,7 @@ namespace sys {
         auto resizeEvent = std::make_shared<Event>(Event::RESIZE);
         m_stage->dispatchEvent(*resizeEvent);
         
-        std::cout << "Stage size updated to: " << stageWidth << "x" << stageHeight << std::endl;
+        EGRET_INFOF("Stage size updated to: {}x{}", stageWidth, stageHeight);
     }
     
     void Player::handleSDLEvent(const SDL_Event& sdlEvent) {
@@ -212,7 +284,7 @@ namespace sys {
         // 启动播放器
         start();
         
-        std::cout << "Starting Player main loop..." << std::endl;
+        EGRET_INFO("Starting Player main loop...");
         
         auto& ticker = getTicker();
         auto lastTime = std::chrono::high_resolution_clock::now();
@@ -237,7 +309,60 @@ namespace sys {
             
             // 清空并呈现SDL窗口
             m_sdlWindow->clear();
-            // TODO: 在这里可以将Skia的渲染结果复制到SDL纹理
+
+            // 将Skia的渲染结果复制到SDL窗口
+            if (m_screenDisplayList && m_screenDisplayList->getRenderBuffer()) {
+                auto renderBuffer = m_screenDisplayList->getRenderBuffer();
+
+                // 一次性保存PNG以便调试
+                static bool savedOnce = false;
+                auto skiaBuffer = std::dynamic_pointer_cast<SkiaRenderBuffer>(renderBuffer);
+                if (!savedOnce && skiaBuffer) {
+                    skiaBuffer->saveToPNG("debug_render.png");
+                    EGRET_INFO("Saved render buffer to debug_render.png");
+                    savedOnce = true;
+                }
+
+                // 将CPU栅格的Skia Surface读成RGBA像素，并更新到SDL纹理
+                if (skiaBuffer && skiaBuffer->isValid() && m_sdlWindow && m_sdlWindow->getRenderer()) {
+                    int texW = static_cast<int>(renderBuffer->getWidth());
+                    int texH = static_cast<int>(renderBuffer->getHeight());
+                    if (texW > 0 && texH > 0) {
+                        static SDL_Texture* s_texture = nullptr;
+                        static int s_texW = 0;
+                        static int s_texH = 0;
+
+                        // 尺寸变化时重建纹理
+                        if (!s_texture || s_texW != texW || s_texH != texH) {
+                            if (s_texture) {
+                                SDL_DestroyTexture(s_texture);
+                                s_texture = nullptr;
+                            }
+                            s_texture = SDL_CreateTexture(m_sdlWindow->getRenderer(),
+                                                          SDL_PIXELFORMAT_RGBA8888,
+                                                          SDL_TEXTUREACCESS_STREAMING,
+                                                          texW, texH);
+                            s_texW = texW;
+                            s_texH = texH;
+                        }
+
+                        if (s_texture) {
+                            // 从Skia Surface读取为RGBA8888（预乘Alpha）
+                            std::vector<uint8_t> pixels(static_cast<size_t>(texW) * static_cast<size_t>(texH) * 4);
+                            SkImageInfo info = SkImageInfo::Make(texW, texH, kRGBA_8888_SkColorType, kPremul_SkAlphaType);
+                            SkSurface* surface = skiaBuffer->getSkSurface();
+                            if (surface && surface->readPixels(info, pixels.data(), texW * 4, 0, 0)) {
+                                // 更新SDL纹理并绘制到窗口
+                                SDL_UpdateTexture(s_texture, nullptr, pixels.data(), texW * 4);
+                                // SDL3渲染：渲染整张纹理到目标
+                                SDL_FRect dstRect{0.0f, 0.0f, static_cast<float>(texW), static_cast<float>(texH)};
+                                SDL_RenderTexture(m_sdlWindow->getRenderer(), s_texture, nullptr, &dstRect);
+                            }
+                        }
+                    }
+                }
+            }
+
             m_sdlWindow->present();
             
             // 控制帧率 (60fps = ~16.67ms per frame)
@@ -254,7 +379,7 @@ namespace sys {
         // 停止播放器
         stop();
         
-        std::cout << "Player main loop ended" << std::endl;
+        EGRET_INFO("Player main loop ended");
         return 0;
     }
     

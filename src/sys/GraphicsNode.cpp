@@ -22,9 +22,10 @@ namespace sys {
 
     std::shared_ptr<Path2D> GraphicsNode::beginFill(uint32_t color, double alpha, 
                                                    std::shared_ptr<Path2D> beforePath) {
-        // 创建填充路径（简化版本，实际需要FillPath类）
+        // 创建填充路径
         auto fillPath = std::make_shared<Path2D>();
-        // TODO: 设置填充属性
+        // 设置填充属性，确保渲染器识别 hasFill 和 paint
+        fillPath->beginFill(color, alpha);
         
         if (beforePath) {
             // 在指定路径前插入
@@ -46,9 +47,17 @@ namespace sys {
                                                            const std::vector<double>& ratios,
                                                            const Matrix* matrix,
                                                            std::shared_ptr<Path2D> beforePath) {
-        // 创建渐变填充路径（简化版本）
+        // 创建渐变填充路径
         auto gradientPath = std::make_shared<Path2D>();
-        // TODO: 设置渐变属性
+        // 转换ratio到字节（0-255）
+        std::vector<uint8_t> ratioBytes;
+        ratioBytes.reserve(ratios.size());
+        for (double r : ratios) {
+            double clamped = std::max(0.0, std::min(255.0, r));
+            ratioBytes.push_back(static_cast<uint8_t>(clamped));
+        }
+        // 设置渐变属性
+        gradientPath->beginGradientFill(type, colors, alphas, ratioBytes, matrix);
         
         if (beforePath) {
             auto it = std::find(m_drawData.begin(), m_drawData.end(), beforePath);

@@ -3,10 +3,13 @@
 #include "display/DisplayObjectContainer.hpp"
 #include "geom/Rectangle.hpp"
 #include "sys/GraphicsNode.hpp"
+#include "sys/Path2D.hpp"
+#include "sys/StrokePath.hpp"
 #include "player/nodes/TextNode.hpp"
 #include "player/nodes/BitmapNode.hpp"
 #include "player/nodes/GroupNode.hpp"
 #include "player/nodes/MeshNode.hpp"
+#include "utils/Logger.hpp"
 
 // Skia头文件
 #include <include/core/SkCanvas.h>
@@ -50,24 +53,35 @@ namespace sys {
     // ========== SystemRenderer接口实现 ==========
     
     int SkiaRenderer::render(DisplayObject* displayObject, RenderBuffer* buffer, const Matrix& matrix, bool forRenderTexture) {
+        EGRET_DEBUG("SkiaRenderer::render() - Starting");
+        
         if (!displayObject || !buffer) {
+            EGRET_WARN("SkiaRenderer::render() - displayObject or buffer is null");
             return 0;
         }
         
+        EGRET_DEBUGF("SkiaRenderer::render() - DisplayObject: x={}, y={}, visible={}, forRenderTexture={}", 
+                    displayObject->getX(), displayObject->getY(), displayObject->getVisible(), forRenderTexture);
+        
         m_nestLevel++;
+        EGRET_DEBUGF("SkiaRenderer::render() - Nest level: {}", m_nestLevel);
         
         // 获取Skia画布
         SkCanvas* canvas = static_cast<SkCanvas*>(buffer->getSurface());
         if (!canvas) {
+            EGRET_ERROR("SkiaRenderer::render() - Failed to get SkCanvas from buffer");
             m_nestLevel--;
             return 0;
         }
+        
+        EGRET_DEBUG("SkiaRenderer::render() - Got SkCanvas successfully");
         
         m_currentCanvas = canvas;
         DisplayObject* root = forRenderTexture ? displayObject : nullptr;
         
         // 保存画布状态并应用变换矩阵
         canvas->save();
+        EGRET_DEBUG("SkiaRenderer::render() - Saved canvas state and applying matrix");
         
         SkMatrix skMatrix;
         skMatrix.setAll(
@@ -77,16 +91,20 @@ namespace sys {
         );
         canvas->concat(skMatrix);
         
+        EGRET_DEBUG("SkiaRenderer::render() - Calling drawDisplayObject()");
         // 绘制显示对象
         int drawCalls = drawDisplayObject(displayObject, canvas, 0, 0, true);
+        EGRET_DEBUGF("SkiaRenderer::render() - drawDisplayObject() returned {} draw calls", drawCalls);
         
         // 恢复画布状态
         canvas->restore();
+        EGRET_DEBUG("SkiaRenderer::render() - Restored canvas state");
         
         m_nestLevel--;
         
         // 在最外层清理对象池
         if (m_nestLevel == 0) {
+            EGRET_DEBUG("SkiaRenderer::render() - Cleaning up object pools (nest level 0)");
             // 限制缓冲区池大小
             if (m_renderBufferPool.size() > MAX_BUFFER_POOL_SIZE) {
                 m_renderBufferPool.resize(MAX_BUFFER_POOL_SIZE);
@@ -109,6 +127,7 @@ namespace sys {
         }
         
         m_currentCanvas = nullptr;
+        EGRET_DEBUGF("SkiaRenderer::render() - Finished with {} draw calls", drawCalls);
         return drawCalls;
     }
     
@@ -148,9 +167,16 @@ namespace sys {
     // ========== 私有渲染方法实现 ==========
     
     int SkiaRenderer::drawDisplayObject(DisplayObject* displayObject, SkCanvas* canvas, double offsetX, double offsetY, bool isStage) {
+        EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Starting: offsetX={}, offsetY={}, isStage={}", 
+                    offsetX, offsetY, isStage);
+        
         if (!displayObject || !canvas) {
+            EGRET_WARN("SkiaRenderer::drawDisplayObject() - displayObject or canvas is null");
             return 0;
         }
+        
+        EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - DisplayObject: x={}, y={}, visible={}", 
+                    displayObject->getX(), displayObject->getY(), displayObject->getVisible());
         
         int drawCalls = 0;
         RenderNode* node = nullptr;
@@ -158,60 +184,112 @@ namespace sys {
         // 获取显示列表或渲染节点
         auto displayList = displayObject->getDisplayList();
         if (displayList && !isStage) {
-            // TODO: 检查缓存脏标记
-            // if (displayObject->getCacheDirty() || displayObject->getRenderDirty() || ...) {
+            EGRET_DEBUG("SkiaRenderer::drawDisplayObject() - Object has DisplayList (container)");
+            // 容器对象：检查是否需要重绘到自己的缓存
+            if (displayObject->isCacheDirty() || displayObject->isRenderDirty()) {
+                EGRET_DEBUG("SkiaRenderer::drawDisplayObject() - Container is dirty, redrawing DisplayList");
                 drawCalls += displayList->drawToSurface();
-            // }
+            }
             node = displayList->getRenderNode().get();
         } else {
-            // TODO: 获取显示对象的渲染节点
-            // if (displayObject->getRenderDirty()) {
-            //     node = displayObject->getRenderNode();
-            // } else {
-            //     node = displayObject->getCachedRenderNode();
-            // }
+            EGRET_DEBUG("SkiaRenderer::drawDisplayObject() - Getting direct RenderNode");
+            // 普通显示对象：直接获取RenderNode
+            node = displayObject->getRenderNode().get();
         }
         
-        // 渲染节点内容
         if (node) {
+            EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Found RenderNode of type: {}", 
+                        static_cast<int>(node->getType()));
+        } else {
+            EGRET_DEBUG("SkiaRenderer::drawDisplayObject() - No RenderNode found");
+        }
+        
+        // 清除脏标记
+        displayObject->setCacheDirty(false);
+        
+        // 渲染当前对象的RenderNode
+        if (node) {
+            EGRET_DEBUG("SkiaRenderer::drawDisplayObject() - Rendering RenderNode");
             drawCalls++;
             canvas->save();
             canvas->translate(SkDoubleToScalar(offsetX), SkDoubleToScalar(offsetY));
             
-            renderNode(node, canvas);
+            int nodeDrawCalls = renderNode(node, canvas, false);
+            EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - RenderNode returned {} draw calls", nodeDrawCalls);
+            drawCalls += nodeDrawCalls;
             
             canvas->restore();
         }
         
-        // 如果有显示列表且不是舞台，直接返回
-        if (displayList && !isStage) {
-            return drawCalls;
-        }
-        
-        // 渲染子对象
+        // 关键：递归渲染所有子对象
         auto container = dynamic_cast<DisplayObjectContainer*>(displayObject);
         if (container) {
-            // TODO: 获取子对象列表并渲染
-            // auto children = container->getChildren();
-            // for (auto child : children) {
-            //     // 计算子对象变换
-            //     double childOffsetX = offsetX + child->getX() - child->getAnchorOffsetX();
-            //     double childOffsetY = offsetY + child->getY() - child->getAnchorOffsetY();
-            //     
-            //     // 处理alpha、混合模式、变换等
-            //     canvas->save();
-            //     
-            //     if (child->getAlpha() != 1.0) {
-            //         canvas->saveLayerAlpha(nullptr, static_cast<U8CPU>(child->getAlpha() * 255));
-            //     }
-            //     
-            //     // 递归渲染子对象
-            //     drawCalls += drawDisplayObject(child, canvas, childOffsetX, childOffsetY);
-            //     
-            //     canvas->restore();
-            // }
+            int numChildren = container->getNumChildren();
+            EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Container has {} children", numChildren);
+            
+            for (int i = 0; i < numChildren; i++) {
+                auto child = container->getChildAt(i);
+                if (!child) {
+                    EGRET_WARNF("SkiaRenderer::drawDisplayObject() - Child {} is null", i);
+                    continue;
+                }
+                
+                if (!child->getVisible()) {
+                    EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Child {} is not visible, skipping", i);
+                    continue;
+                }
+                
+                EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Rendering child {}: x={}, y={}", 
+                           i, child->getX(), child->getY());
+                
+                // 计算子对象变换
+                canvas->save();
+                
+                double childOffsetX, childOffsetY;
+                if (child->shouldUseTransform()) {
+                    EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Child {} uses transform matrix", i);
+                    // 使用完整变换矩阵
+                    Matrix matrix = child->getMatrix();
+                    SkMatrix childMatrix;
+                    childMatrix.setAll(
+                        SkDoubleToScalar(matrix.getA()), SkDoubleToScalar(matrix.getC()), SkDoubleToScalar(matrix.getTx()),
+                        SkDoubleToScalar(matrix.getB()), SkDoubleToScalar(matrix.getD()), SkDoubleToScalar(matrix.getTy()),
+                        SkDoubleToScalar(0.0), SkDoubleToScalar(0.0), SkDoubleToScalar(1.0)
+                    );
+                    canvas->concat(childMatrix);
+                    
+                    childOffsetX = -child->getAnchorOffsetX();
+                    childOffsetY = -child->getAnchorOffsetY();
+                } else {
+                    EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Child {} uses simple translation", i);
+                    // 简单偏移
+                    childOffsetX = offsetX + child->getX() - child->getAnchorOffsetX();
+                    childOffsetY = offsetY + child->getY() - child->getAnchorOffsetY();
+                }
+                
+                EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Child {} final offsets: x={}, y={}", 
+                           i, childOffsetX, childOffsetY);
+                
+                // 处理透明度
+                if (child->getAlpha() < 1.0) {
+                    EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Child {} has alpha={}", 
+                               i, child->getAlpha());
+                    canvas->saveLayerAlpha(nullptr, static_cast<U8CPU>(child->getAlpha() * 255));
+                }
+                
+                // 递归调用
+                int childDrawCalls = drawDisplayObject(child, canvas, childOffsetX, childOffsetY, false);
+                EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Child {} returned {} draw calls", 
+                           i, childDrawCalls);
+                drawCalls += childDrawCalls;
+                
+                canvas->restore();
+            }
+        } else {
+            EGRET_DEBUG("SkiaRenderer::drawDisplayObject() - Object is not a container");
         }
         
+        EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Completed with {} total draw calls", drawCalls);
         return drawCalls;
     }
     
@@ -308,23 +386,49 @@ namespace sys {
             return 0;
         }
         
-        // TODO: 实现矢量图形渲染
-        // const auto& drawData = node->getDrawData();
-        // for (auto& pathData : drawData) {
-        //     switch (pathData.type) {
-        //         case PathType::Fill:
-        //             // 设置填充样式并绘制
-        //             break;
-        //         case PathType::Stroke:
-        //             // 设置描边样式并绘制
-        //             break;
-        //         case PathType::GradientFill:
-        //             // 设置渐变填充并绘制
-        //             break;
-        //     }
-        // }
+        // 获取绘图数据（Path2D对象列表）
+        const auto& drawData = node->getDrawData();
+        if (drawData.empty()) {
+            return 0;
+        }
         
-        return 1;
+        int drawCalls = 0;
+        
+        // 遍历所有Path2D对象
+        for (const auto& path : drawData) {
+            if (!path || path->isEmpty()) {
+                continue;
+            }
+            
+            // 获取Skia路径对象
+            SkPath* skiaPath = path->getSkiaPath();
+            if (!skiaPath) {
+                continue;
+            }
+            
+            // 绘制填充
+            if (path->hasFill()) {
+                SkPaint* fillPaint = path->getFillPaint();
+                if (fillPaint) {
+                    fillPaint->setAntiAlias(true);
+                    canvas->drawPath(*skiaPath, *fillPaint);
+                    drawCalls++;
+                }
+            }
+            
+            // 检查是否是StrokePath并处理描边
+            auto strokePath = std::dynamic_pointer_cast<sys::StrokePath>(path);
+            if (strokePath && strokePath->hasStroke()) {
+                SkPaint* strokePaint = strokePath->getStrokePaint();
+                if (strokePaint && strokePath->getThickness() > 0) {
+                    strokePaint->setAntiAlias(true);
+                    canvas->drawPath(*skiaPath, *strokePaint);
+                    drawCalls++;
+                }
+            }
+        }
+        
+        return drawCalls;
     }
     
     int SkiaRenderer::renderGroup(GroupNode* node, SkCanvas* canvas) {

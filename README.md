@@ -98,47 +98,69 @@ EgretCpp/
 git clone <repository-url>
 cd EgretCpp
 
-# Configure Debug build
+# Build the EgretCpp engine library only
 cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug
-
-# Build the project
 cmake --build cmake-build-debug
 
-# Run the executable
-./cmake-build-debug/EgretCpp.exe
+# Option 1: Build examples as part of main project
+cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -DBUILD_EXAMPLES=ON
+cmake --build cmake-build-debug
+
+# Option 2: Build examples independently (recommended)
+cd examples/01-basic-window
+cmake -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+./build/basic-window
 ```
 
 ### Release Build
 
 ```bash
-# Configure Release build
+# Build engine library in Release mode
 cmake -B cmake-build-release -DCMAKE_BUILD_TYPE=Release
-
-# Build and run
 cmake --build cmake-build-release
-./cmake-build-release/EgretCpp.exe
+
+# Build examples in Release mode
+cd examples/01-basic-window
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+./build/basic-window
 ```
 
 ## 🎮 Usage Example
 
+See the complete working example in `examples/01-basic-window/`:
+
 ```cpp
+// Basic EgretCpp application setup
 #include "display/Stage.hpp"
-#include "display/Sprite.hpp"
+#include "sys/Screen.hpp"
+#include "player/Player.hpp"
+#include "sys/SystemTicker.hpp"
 
-// Create stage
-auto stage = std::make_shared<egret::Stage>();
-stage->setFrameRate(60);
+// Create Screen (equivalent to WebPlayer screen management)
+m_screen = std::make_shared<egret::sys::Screen>();
+m_screen->setDesignSize(800, 600);
 
-// Create sprite
-auto sprite = std::make_shared<egret::Sprite>();
-sprite->setX(100);
-sprite->setY(100);
+// Create Stage (equivalent to TypeScript new egret.Stage())
+m_stage = std::make_shared<egret::Stage>();
+m_stage->setScreen(m_screen);
+m_stage->setFrameRate(60);
 
-// Add to display tree
-stage->addChild(sprite);
+// Create SystemTicker and Player
+m_ticker = egret::sys::SystemTicker::getTicker();
+m_player = std::make_shared<egret::sys::Player>();
 
-// Render
-stage->drawToSurface(skSurface);
+// Start the game loop
+m_ticker->addPlayer(m_player);
+m_ticker->startTick(callback);
+```
+
+Run the basic window example:
+```bash
+cd examples/01-basic-window
+cmake -B build && cmake --build build
+./build/basic-window
 ```
 
 ## 🗺️ Development Roadmap

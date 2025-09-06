@@ -1,6 +1,7 @@
 #include "display/DisplayObject.hpp"
 #include "display/DisplayObjectContainer.hpp"
 #include "display/Stage.hpp"
+#include "sys/GraphicsNode.hpp"  // 添加GraphicsNode头文件
 #include <algorithm>
 #include <cmath>
 #include <glm/gtc/constants.hpp>
@@ -415,23 +416,35 @@ namespace egret {
     // ========== 渲染相关方法实现 ==========
     
     std::shared_ptr<sys::RenderNode> DisplayObject::getRenderNode() const {
-        if (m_displayList) {
-            return m_displayList->getRenderNode();
-        }
-        return nullptr;
+        // 直接返回对象自己的RenderNode，而不是通过DisplayList
+        return m_renderNode;
     }
     
     void DisplayObject::setRenderNode(std::shared_ptr<sys::RenderNode> node) {
-        if (!m_displayList) {
-            m_displayList = std::make_shared<sys::DisplayList>();
+        // 直接设置对象自己的RenderNode
+        m_renderNode = node;
+        if (m_renderNode) {
+            setRenderDirty(true);
         }
-        m_displayList->setRenderNode(node);
+    }
+    
+    void DisplayObject::setRenderNode(std::shared_ptr<sys::GraphicsNode> node) {
+        // GraphicsNode重载 - 将GraphicsNode转换为RenderNode
+        m_renderNode = std::static_pointer_cast<sys::RenderNode>(node);
+        if (m_renderNode) {
+            setRenderDirty(true);
+        }
     }
     
     void DisplayObject::setRenderDirty(bool dirty) {
-        if (m_displayList) {
-            m_displayList->setDirty(dirty);
+        m_renderDirty = dirty;
+        if (dirty) {
+            setCacheDirty(true);
         }
+    }
+    
+    bool DisplayObject::isRenderDirty() const {
+        return m_renderDirty;
     }
     
     void DisplayObject::setMeasuredSize(double width, double height) {

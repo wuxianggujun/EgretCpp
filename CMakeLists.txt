@@ -236,10 +236,14 @@ target_link_libraries(EgretEngine PUBLIC
     SDL3::SDL3
 )
 
-# 主程序可执行文件
-add_executable(EgretCpp 
-    main.cpp
-)
+# Note: Main executable removed - use examples instead
+# Build examples with: cd examples/01-basic-window && cmake -B build && cmake --build build
 
-# 链接Egret引擎到主程序
-target_link_libraries(EgretCpp PRIVATE EgretEngine)
+# Option to build examples as part of main project
+option(BUILD_EXAMPLES "Build example applications" ON)
+
+# Add examples as subdirectory (optional)
+if(BUILD_EXAMPLES)
+    message(STATUS "Building examples...")
+    add_subdirectory(examples)
+endif()

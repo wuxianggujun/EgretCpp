@@ -66,6 +66,14 @@ namespace egret {
         if (m_graphics) {
             // 设置Graphics的目标显示对象为当前Shape
             m_graphics->setTarget(this);
+            
+            // 将Graphics的RenderNode设置为Shape的RenderNode
+            // 这样当Shape被添加到Stage时，Graphics的内容就会被渲染
+            auto graphicsNode = m_graphics->getRenderNode();
+            if (graphicsNode) {
+                // 直接将GraphicsNode设置为RenderNode（利用多态）
+                setRenderNode(graphicsNode);
+            }
         }
     }
 

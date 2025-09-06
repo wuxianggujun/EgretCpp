@@ -200,6 +200,11 @@ namespace egret {
          */
         void setDisplayList(std::shared_ptr<sys::DisplayList> displayList) { m_displayList = displayList; }
         
+        /**
+         * 构建渲染内容 - 将所有子对象的RenderNode收集到DisplayList中
+         */
+        void buildRenderContent();
+        
         // ========== 重写父类方法 ==========
         
         /**

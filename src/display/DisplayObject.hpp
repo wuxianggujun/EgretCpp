@@ -19,6 +19,7 @@ namespace egret {
         class DisplayList;
         class SystemRenderer;  // SystemRenderer前向声明
         class SkiaRenderer;   // SkiaRenderer前向声明
+        class GraphicsNode;   // GraphicsNode前向声明
     }
     
     // 渲染模式枚举
@@ -343,6 +344,36 @@ namespace egret {
          */
         void cacheDirtyUp();
         
+        /**
+         * 获取渲染节点
+         */
+        std::shared_ptr<sys::RenderNode> getRenderNode() const;
+        
+        /**
+         * 设置渲染节点
+         */
+        void setRenderNode(std::shared_ptr<sys::RenderNode> node);
+        
+        /**
+         * 设置渲染节点 (GraphicsNode重载)
+         */
+        void setRenderNode(std::shared_ptr<sys::GraphicsNode> node);
+        
+        /**
+         * 检查是否需要重新渲染
+         */
+        bool isRenderDirty() const;
+        
+        /**
+         * 设置渲染脏标记
+         */
+        void setRenderDirty(bool dirty = true);
+        
+        /**
+         * 检查是否使用变换
+         */
+        bool shouldUseTransform() const { return m_useTranslate; }
+        
     protected:
         // ========== 受保护的辅助方法 ==========
         
@@ -376,21 +407,6 @@ namespace egret {
          * 设置显示列表（内部使用）
          */
         void setDisplayList(std::shared_ptr<sys::DisplayList> displayList) { m_displayList = displayList; }
-        
-        /**
-         * 获取渲染节点
-         */
-        std::shared_ptr<sys::RenderNode> getRenderNode() const;
-        
-        /**
-         * 设置渲染节点
-         */
-        void setRenderNode(std::shared_ptr<sys::RenderNode> node);
-        
-        /**
-         * 设置渲染脏标记
-         */
-        void setRenderDirty(bool dirty = true);
         
         /**
          * 设置测量尺寸
@@ -454,6 +470,10 @@ namespace egret {
         
         // 缓存标记
         bool m_cacheDirty = false;
+        bool m_renderDirty = false;
+        
+        // 渲染相关
+        std::shared_ptr<sys::RenderNode> m_renderNode;
         
         // 显示列表（用于渲染）
         std::shared_ptr<sys::DisplayList> m_displayList;
