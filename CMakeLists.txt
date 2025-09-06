@@ -49,6 +49,7 @@ set(EGRET_CORE_SOURCES
     src/events/Event.cpp
     src/events/EventDispatcher.cpp
     src/events/TouchEvent.cpp
+    src/events/Keyboard.cpp
     src/events/KeyboardEvent.cpp
     src/events/TimerEvent.cpp
     src/events/TextEvent.cpp
@@ -136,6 +137,7 @@ set(EGRET_CORE_HEADERS
     src/events/EventPhase.hpp
     src/events/EventDispatcher.hpp
     src/events/TouchEvent.hpp
+    src/events/Keyboard.hpp
     src/events/KeyboardEvent.hpp
     src/events/TimerEvent.hpp
     src/events/TextEvent.hpp

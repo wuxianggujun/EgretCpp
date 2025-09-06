@@ -85,21 +85,19 @@ namespace egret {
         targetChanged_ = false;
         try {
             if (auto displayObjectPtr = std::any_cast<DisplayObject*>(getTarget())) {
-                // TODO: Implement getInvertedConcatenatedMatrix and transformPoint
-                // Matrix m = displayObjectPtr->getInvertedConcatenatedMatrix();
-                // m.transformPoint(stageX_, stageY_, localPoint_);
-                // localX_ = localPoint_.getX();
-                // localY_ = localPoint_.getY();
-                
-                // Temporary implementation
-                localX_ = stageX_;
-                localY_ = stageY_;
+                // 使用对象的逆连接矩阵将舞台坐标转换为本地坐标
+                Matrix* inv = displayObjectPtr->getInvertedConcatenatedMatrix();
+                Point p = inv->transformPoint(Point(stageX_, stageY_));
+                localX_ = p.getX();
+                localY_ = p.getY();
+                return;
             }
-        } catch (const std::bad_any_cast& e) {
-            // Handle case where target is not a DisplayObject*
-            localX_ = stageX_;
-            localY_ = stageY_;
+        } catch (const std::bad_any_cast&) {
+            // 忽略
         }
+        // 回退
+        localX_ = stageX_;
+        localY_ = stageY_;
     }
 
     bool TouchEvent::dispatchTouchEvent(IEventDispatcher* target, const std::string& type,

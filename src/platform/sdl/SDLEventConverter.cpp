@@ -82,13 +82,12 @@ namespace platform {
         }
         
         if (touchEvent) {
-            // 命中测试，优先派发给命中的显示对象
+            // 命中测试，优先派发给命中的显示对象；若未命中则派发到Stage
             if (auto target = m_stage->hitTest(x, y)) {
                 target->dispatchEvent(*touchEvent);
+            } else {
+                m_stage->dispatchEvent(*touchEvent);
             }
-            // 同时派发到Stage，便于全局监听（无冒泡模型的兼容）
-            auto stageEvent = std::make_shared<TouchEvent>(touchEvent->getType(), true, true, x, y, 0);
-            m_stage->dispatchEvent(*stageEvent);
             return true;
         }
         
@@ -123,13 +122,11 @@ namespace platform {
         }
         
         if (touchEvent) {
-            // 命中测试，优先派发给命中的显示对象
             if (auto target = m_stage->hitTest(x, y)) {
                 target->dispatchEvent(*touchEvent);
+            } else {
+                m_stage->dispatchEvent(*touchEvent);
             }
-            // 同时派发到Stage，便于全局监听（无冒泡模型的兼容）
-            auto stageEvent = std::make_shared<TouchEvent>(touchEvent->getType(), true, true, x, y, touchId);
-            m_stage->dispatchEvent(*stageEvent);
             return true;
         }
         

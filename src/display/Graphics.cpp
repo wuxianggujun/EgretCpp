@@ -6,6 +6,7 @@
 #include "sys/Path2D.hpp"
 #include "sys/StrokePath.hpp"
 #include "utils/Logger.hpp"
+#include <include/core/SkPath.h>
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -426,11 +427,32 @@ namespace egret {
         if (!m_targetDisplay) {
             return nullptr;
         }
-        
-        // TODO: 实现基于Skia的精确点击测试
-        // 这里需要使用Skia的路径点击测试功能
-        // 暂时返回基本的边界框测试结果
-        return m_targetDisplay;
+        // 将舞台坐标转为目标显示对象本地坐标
+        Matrix* inv = m_targetDisplay->getInvertedConcatenatedMatrix();
+        Point lp = inv->transformPoint(Point(stageX, stageY));
+
+        // 优先使用填充路径进行包含测试
+        if (m_renderNode) {
+            const auto& drawData = m_renderNode->getDrawData();
+            for (const auto& path : drawData) {
+                if (!path) continue;
+                // 仅对有填充的路径进行 contains 判断
+                if (path->hasFill()) {
+                    SkPath* skp = path->getSkiaPath();
+                    if (skp && skp->contains(static_cast<SkScalar>(lp.getX()), static_cast<SkScalar>(lp.getY()))) {
+                        return m_targetDisplay;
+                    }
+                }
+            }
+        }
+
+        // 回退：使用测量边界做粗略命中
+        Rectangle bounds;
+        measureContentBounds(bounds);
+        if (bounds.contains(lp.getX(), lp.getY())) {
+            return m_targetDisplay;
+        }
+        return nullptr;
     }
 
     // ========== 内部系统方法 ==========

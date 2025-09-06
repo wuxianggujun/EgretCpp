@@ -5,6 +5,8 @@
 #include "EventDispatcher.hpp"
 
 #include "Event.hpp"
+#include "display/DisplayObject.hpp"
+#include "display/DisplayObjectContainer.hpp"
 
 namespace egret
 {
@@ -64,9 +66,70 @@ namespace egret
 
     bool EventDispatcher::dispatchEvent(Event& event)
     {
-        event.setCurrentTarget(m_eventDispatcher.eventTarget);
+        // 设置事件目标（首次）
         event.setTarget(m_eventDispatcher.eventTarget);
-        return notifyListener(event, false);
+
+        // 如果目标是DisplayObject，构建祖先链路以支持 捕获->目标->冒泡
+        DisplayObject* targetDO = nullptr;
+        try {
+            targetDO = std::any_cast<DisplayObject*>(event.getTarget());
+        } catch (...) {
+            targetDO = nullptr;
+        }
+
+        if (!targetDO) {
+            // 非显示对象，直接在当前dispatcher上触发
+            event.setCurrentTarget(m_eventDispatcher.eventTarget);
+            event.setEventPhase(EventPhase::AT_TARGET);
+            return notifyListener(event, false);
+        }
+
+        // 构建从Stage到目标的祖先链（不含空）
+        std::vector<DisplayObject*> chain;
+        DisplayObject* node = targetDO;
+        while (node) {
+            chain.push_back(node);
+            node = node->getParent();
+        }
+        // chain: [target, parent, ..., stage]，我们需要从后往前捕获
+
+        // 捕获阶段：stage -> parent（不包括 target）
+        for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
+            DisplayObject* current = *it;
+            if (current == targetDO) break;
+            event.setCurrentTarget(current);
+            event.setEventPhase(EventPhase::CAPTURING_PHASE);
+            notifyListener(event, true);
+            if (event.isPropagationStopped() || event.isPropagationImmediateStopped()) {
+                return !event.isDefaultPrevented();
+            }
+        }
+
+        // 目标阶段：在 target 上先触发捕获监听（useCapture=true），再触发冒泡监听（useCapture=false）
+        event.setCurrentTarget(targetDO);
+        event.setEventPhase(EventPhase::AT_TARGET);
+        notifyListener(event, true);
+        if (!(event.isPropagationStopped() || event.isPropagationImmediateStopped())) {
+            notifyListener(event, false);
+        }
+        if (event.isPropagationStopped() || event.isPropagationImmediateStopped()) {
+            return !event.isDefaultPrevented();
+        }
+
+        // 冒泡阶段：从 parent -> stage（仅当事件可冒泡）
+        if (event.getBubbles()) {
+            for (size_t i = 1; i < chain.size(); ++i) {
+                DisplayObject* current = chain[i];
+                event.setCurrentTarget(current);
+                event.setEventPhase(EventPhase::BUBBLING_PHASE);
+                notifyListener(event, false);
+                if (event.isPropagationStopped() || event.isPropagationImmediateStopped()) {
+                    break;
+                }
+            }
+        }
+
+        return !event.isDefaultPrevented();
     }
 
     bool EventDispatcher::willTrigger(const std::string& type) const

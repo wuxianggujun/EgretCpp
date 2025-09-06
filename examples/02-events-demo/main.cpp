@@ -173,7 +173,7 @@ int main(int argc, char* argv[]) {
     egret::Logger::setLogFile("egret-events.log", true);
     egret::Logger::setConsoleEnabled(true);
     egret::Logger::setLogLevel(egret::Logger::Level::INFO);
-    EGRET_INFO("=== EgretCpp Events Demo ===");
+    EGRET_INFO("=== Example 02 - Events Demo ===");
     EventsDemo app;
     if (!app.initialize()) {
         EGRET_ERROR("初始化失败");

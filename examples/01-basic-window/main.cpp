@@ -144,7 +144,7 @@ private:
 };
 
 int main(int argc, char* argv[]) {
-    EGRET_INFO("=== EgretCpp Basic Window Example ===");
+    EGRET_INFO("=== Example 01 - Basic Window ===");
     EGRET_INFO("Initializing engine components...");
     
     BasicWindowExample app;
