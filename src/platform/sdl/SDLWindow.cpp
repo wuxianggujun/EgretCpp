@@ -1,5 +1,6 @@
 #include "platform/sdl/SDLWindow.hpp"
 #include <iostream>
+#include "utils/Logger.hpp"
 #include <stdexcept>
 
 namespace egret {
@@ -39,7 +40,7 @@ namespace platform {
         // 设置渲染器混合模式
         SDL_SetRenderDrawBlendMode(m_renderer, SDL_BLENDMODE_BLEND);
         
-        std::cout << "SDL Window created: " << width << "x" << height << " - " << title << std::endl;
+        EGRET_INFOF("SDL窗口创建: {}x{} - {}", width, height, title);
     }
     
     SDLWindow::~SDLWindow() {
@@ -53,7 +54,7 @@ namespace platform {
             m_window = nullptr;
         }
         
-        std::cout << "SDL Window destroyed" << std::endl;
+        EGRET_INFO("SDL窗口销毁");
     }
     
     bool SDLWindow::pollEvents() {
@@ -66,7 +67,7 @@ namespace platform {
             else if (m_currentEvent.type == SDL_EVENT_WINDOW_RESIZED) {
                 m_width = m_currentEvent.window.data1;
                 m_height = m_currentEvent.window.data2;
-                std::cout << "Window resized to: " << m_width << "x" << m_height << std::endl;
+                EGRET_INFOF("窗口尺寸: {}x{}", m_width, m_height);
             }
             
             return true;
@@ -99,7 +100,7 @@ namespace platform {
             SDL_SetWindowSize(m_window, width, height);
             m_width = width;
             m_height = height;
-            std::cout << "Window size set to: " << width << "x" << height << std::endl;
+            EGRET_INFOF("设置窗口尺寸: {}x{}", width, height);
         }
     }
     
@@ -111,7 +112,7 @@ namespace platform {
         if (m_window && title != m_title) {
             SDL_SetWindowTitle(m_window, title.c_str());
             m_title = title;
-            std::cout << "Window title set to: " << title << std::endl;
+            EGRET_INFOF("设置窗口标题: {}", title);
         }
     }
 

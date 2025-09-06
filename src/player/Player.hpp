@@ -192,6 +192,11 @@ namespace sys {
         std::shared_ptr<platform::SDLWindow> m_sdlWindow;     // SDL窗口管理器
         std::shared_ptr<platform::SDLEventConverter> m_eventConverter; // 事件转换器
         bool m_ownWindow;                                     // 是否拥有窗口（用于析构时判断）
+
+        // SDL呈现纹理（将Skia渲染结果拷贝后显示到窗口）
+        SDL_Texture* m_presentTexture = nullptr;
+        int m_presentTexW = 0;
+        int m_presentTexH = 0;
     };
 
 } // namespace sys

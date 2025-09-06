@@ -255,6 +255,13 @@ private:
      * @param func 函数名
      */
     static void doLog(Level level, const std::string& message, const char* file = nullptr, int line = 0, const char* func = nullptr);
+
+    /**
+     * @brief 简化函数名：去掉命名空间/类限定，只保留短函数名
+     * @param func 原始函数名（可能包含命名空间/类）
+     * @return 去限定后的短函数名（例如 "drawDisplayObject"）
+     */
+    static std::string simplifyFunction(const char* func);
     
     /**
      * @brief 格式化日志输出的内部实现

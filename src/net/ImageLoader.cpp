@@ -11,6 +11,7 @@
 #include "events/Event.hpp"
 #include "events/IOErrorEvent.hpp"
 #include <iostream>
+#include "utils/Logger.hpp"
 #include <fstream>
 #include <vector>
 
@@ -118,7 +119,7 @@ namespace egret {
         cleanup();
 
         // 打印错误信息（调试用）
-        std::cerr << "ImageLoader Error: " << errorMessage << std::endl;
+        EGRET_ERRORF("ImageLoader错误: {}", errorMessage);
 
         // 派发错误事件
         auto errorEvent = IOErrorEvent::create(IOErrorEvent::IO_ERROR);

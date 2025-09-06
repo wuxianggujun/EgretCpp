@@ -78,11 +78,8 @@ namespace sys {
                                                        const std::vector<double>& lineDash) {
         auto strokePath = std::make_shared<StrokePath>();
         
-        // 设置线条属性
-        strokePath->setLineWidth(thickness);
-        strokePath->setLineColor(color);
-        strokePath->setLineAlpha(alpha);
-        // TODO: 设置其他线条属性
+        // 设置线条属性（确保 hasStroke 正确置位）
+        strokePath->setLineStyle(thickness, color, alpha, caps, joints, miterLimit, lineDash);
         
         m_drawData.push_back(strokePath);
         dirtyRender = true;

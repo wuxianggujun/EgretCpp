@@ -1,6 +1,7 @@
 #include "utils/Lifecycle.hpp"
 #include "events/Event.hpp"
 #include <iostream>
+#include "utils/Logger.hpp"
 
 namespace egret {
 
@@ -29,7 +30,7 @@ namespace egret {
             plugin(context);
         }
         catch (const std::exception& e) {
-            std::cerr << "Error in lifecycle plugin: " << e.what() << std::endl;
+            EGRET_ERRORF("Lifecycle插件错误: {}", e.what());
         }
     }
     
@@ -52,7 +53,7 @@ namespace egret {
                 m_onPause();
             }
             catch (const std::exception& e) {
-                std::cerr << "Error in pause callback: " << e.what() << std::endl;
+                EGRET_ERRORF("pause回调错误: {}", e.what());
             }
         }
         
@@ -63,7 +64,7 @@ namespace egret {
             }
         }
         
-        std::cout << "Lifecycle paused" << std::endl;
+        EGRET_INFO("Lifecycle暂停");
     }
     
     void LifecycleManager::resumeAll() {
@@ -85,7 +86,7 @@ namespace egret {
                 m_onResume();
             }
             catch (const std::exception& e) {
-                std::cerr << "Error in resume callback: " << e.what() << std::endl;
+                EGRET_ERRORF("resume回调错误: {}", e.what());
             }
         }
         
@@ -96,7 +97,7 @@ namespace egret {
             }
         }
         
-        std::cout << "Lifecycle resumed" << std::endl;
+        EGRET_INFO("Lifecycle恢复");
     }
 
 } // namespace egret

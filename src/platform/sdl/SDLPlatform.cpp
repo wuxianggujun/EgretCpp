@@ -2,6 +2,7 @@
 #include "player/PlayerFactory.hpp"
 #include "player/SkiaRenderBuffer.hpp"
 #include <iostream>
+#include "utils/Logger.hpp"
 #include <chrono>
 #include <thread>
 
@@ -24,20 +25,20 @@ namespace platform {
             
             // 清理SDL
             SDL_Quit();
-            std::cout << "SDL Platform destroyed" << std::endl;
+            EGRET_INFO("SDL平台销毁");
         }
     }
     
     bool SDLPlatform::initialize(int width, int height, const std::string& title) {
         if (m_initialized) {
-            std::cout << "SDL Platform already initialized" << std::endl;
+            EGRET_INFO("SDL平台已初始化");
             return true;
         }
         
         // 初始化SDL
         int result = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS);
         if (result < 0) {
-            std::cerr << "Failed to initialize SDL: " << SDL_GetError() << std::endl;
+            EGRET_ERRORF("初始化SDL失败: {}", SDL_GetError());
             return false;
         }
         
@@ -46,17 +47,17 @@ namespace platform {
             m_window = std::make_shared<SDLWindow>(width, height, title);
             
             if (!m_window->isValid()) {
-                std::cerr << "Failed to create SDL window" << std::endl;
+                EGRET_ERROR("创建SDL窗口失败");
                 SDL_Quit();
                 return false;
             }
             
             m_initialized = true;
-            std::cout << "SDL Platform initialized successfully" << std::endl;
+            EGRET_INFO("SDL平台初始化成功");
             return true;
             
         } catch (const std::exception& e) {
-            std::cerr << "Exception during SDL initialization: " << e.what() << std::endl;
+            EGRET_ERRORF("SDL初始化异常: {}", e.what());
             SDL_Quit();
             return false;
         }
@@ -64,7 +65,7 @@ namespace platform {
     
     std::shared_ptr<sys::Player> SDLPlatform::createPlayer(const std::string& entryClassName) {
         if (!m_initialized) {
-            std::cerr << "SDL Platform not initialized" << std::endl;
+            EGRET_ERROR("SDL平台未初始化");
             return nullptr;
         }
         
@@ -86,18 +87,18 @@ namespace platform {
         // 创建事件转换器
         m_eventConverter = std::make_shared<SDLEventConverter>(m_player->getStage());
         
-        std::cout << "Player created with entry class: " << entryClassName << std::endl;
+        EGRET_INFOF("创建Player，入口类: {}", entryClassName);
         return m_player;
     }
     
     int SDLPlatform::runMainLoop() {
         if (!m_initialized) {
-            std::cerr << "SDL Platform not initialized" << std::endl;
+            EGRET_ERROR("SDL平台未初始化");
             return -1;
         }
         
         if (!m_player) {
-            std::cerr << "No player created" << std::endl;
+            EGRET_ERROR("尚未创建Player");
             return -1;
         }
         
@@ -105,7 +106,7 @@ namespace platform {
         m_player->start();
         
         m_running = true;
-        std::cout << "Starting main loop..." << std::endl;
+        EGRET_INFO("开始主循环...");
         
         auto lastTime = std::chrono::high_resolution_clock::now();
         
@@ -130,7 +131,7 @@ namespace platform {
             lastTime = std::chrono::high_resolution_clock::now();
         }
         
-        std::cout << "Main loop ended" << std::endl;
+        EGRET_INFO("主循环结束");
         return 0;
     }
     

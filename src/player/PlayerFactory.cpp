@@ -1,6 +1,7 @@
 #include "player/PlayerFactory.hpp"
 #include "display/Stage.hpp"
 #include <iostream>
+#include "utils/Logger.hpp"
 
 namespace egret {
 namespace sys {
@@ -52,7 +53,7 @@ namespace sys {
         
         player->setEntryClassFactory(factory);
         
-        std::cout << "Entry class factory registered for player" << std::endl;
+        EGRET_INFO("已注册入口类工厂");
     }
     
     void PlayerFactory::configurePlayer(std::shared_ptr<Player> player, const PlayerOption& option) {
@@ -64,13 +65,11 @@ namespace sys {
         // 更新舞台尺寸
         player->updateStageSize(option.contentWidth, option.contentHeight);
         
-        std::cout << "Player configured:" << std::endl
-                  << "  - Entry Class: " << option.entryClassName << std::endl
-                  << "  - Content Size: " << option.contentWidth << "x" << option.contentHeight << std::endl
-                  << "  - Frame Rate: " << option.frameRate << std::endl
-                  << "  - Scale Mode: " << option.scaleMode << std::endl
-                  << "  - Show FPS: " << (option.showFPS ? "true" : "false") << std::endl
-                  << "  - Show Log: " << (option.showLog ? "true" : "false") << std::endl;
+        EGRET_INFOF("Player配置: entryClass={}, size={}x{}, fps={}, scaleMode={}, showFPS={}, showLog={}",
+                     option.entryClassName, option.contentWidth, option.contentHeight,
+                     option.frameRate, option.scaleMode,
+                     option.showFPS ? "true" : "false",
+                     option.showLog ? "true" : "false");
     }
     
     std::shared_ptr<Stage> PlayerFactory::createDefaultStage(const PlayerOption& option) {
@@ -87,8 +86,7 @@ namespace sys {
         // stage->setFrameRate(option.frameRate);
         // stage->setTextureScaleFactor(option.textureScaleFactor);
         
-        std::cout << "Default stage created with size: " 
-                  << option.contentWidth << "x" << option.contentHeight << std::endl;
+        EGRET_INFOF("创建默认Stage: {}x{}", option.contentWidth, option.contentHeight);
         
         return stage;
     }

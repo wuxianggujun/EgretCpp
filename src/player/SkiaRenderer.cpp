@@ -53,35 +53,35 @@ namespace sys {
     // ========== SystemRenderer接口实现 ==========
     
     int SkiaRenderer::render(DisplayObject* displayObject, RenderBuffer* buffer, const Matrix& matrix, bool forRenderTexture) {
-        EGRET_DEBUG("SkiaRenderer::render() - Starting");
+        EGRET_DEBUG("Starting");
         
         if (!displayObject || !buffer) {
-            EGRET_WARN("SkiaRenderer::render() - displayObject or buffer is null");
+            EGRET_WARN("displayObject or buffer is null");
             return 0;
         }
         
-        EGRET_DEBUGF("SkiaRenderer::render() - DisplayObject: x={}, y={}, visible={}, forRenderTexture={}", 
+        EGRET_DEBUGF("DisplayObject: x={}, y={}, visible={}, forRT={}", 
                     displayObject->getX(), displayObject->getY(), displayObject->getVisible(), forRenderTexture);
         
         m_nestLevel++;
-        EGRET_DEBUGF("SkiaRenderer::render() - Nest level: {}", m_nestLevel);
+        EGRET_DEBUGF("Nest level: {}", m_nestLevel);
         
         // 获取Skia画布
         SkCanvas* canvas = static_cast<SkCanvas*>(buffer->getSurface());
         if (!canvas) {
-            EGRET_ERROR("SkiaRenderer::render() - Failed to get SkCanvas from buffer");
+            EGRET_ERROR("Failed to get SkCanvas from buffer");
             m_nestLevel--;
             return 0;
         }
         
-        EGRET_DEBUG("SkiaRenderer::render() - Got SkCanvas successfully");
+        EGRET_DEBUG("Got SkCanvas successfully");
         
         m_currentCanvas = canvas;
         DisplayObject* root = forRenderTexture ? displayObject : nullptr;
         
         // 保存画布状态并应用变换矩阵
         canvas->save();
-        EGRET_DEBUG("SkiaRenderer::render() - Saved canvas state and applying matrix");
+        EGRET_DEBUG("Apply matrix");
         
         SkMatrix skMatrix;
         skMatrix.setAll(
@@ -91,20 +91,20 @@ namespace sys {
         );
         canvas->concat(skMatrix);
         
-        EGRET_DEBUG("SkiaRenderer::render() - Calling drawDisplayObject()");
+        EGRET_DEBUG("Call drawDisplayObject");
         // 绘制显示对象
         int drawCalls = drawDisplayObject(displayObject, canvas, 0, 0, true);
-        EGRET_DEBUGF("SkiaRenderer::render() - drawDisplayObject() returned {} draw calls", drawCalls);
+        EGRET_DEBUGF("drawDisplayObject returned {} draw calls", drawCalls);
         
         // 恢复画布状态
         canvas->restore();
-        EGRET_DEBUG("SkiaRenderer::render() - Restored canvas state");
+        EGRET_DEBUG("Restore canvas");
         
         m_nestLevel--;
         
         // 在最外层清理对象池
         if (m_nestLevel == 0) {
-            EGRET_DEBUG("SkiaRenderer::render() - Cleaning up object pools (nest level 0)");
+            EGRET_DEBUG("Cleanup pools (nest 0)");
             // 限制缓冲区池大小
             if (m_renderBufferPool.size() > MAX_BUFFER_POOL_SIZE) {
                 m_renderBufferPool.resize(MAX_BUFFER_POOL_SIZE);
@@ -127,7 +127,7 @@ namespace sys {
         }
         
         m_currentCanvas = nullptr;
-        EGRET_DEBUGF("SkiaRenderer::render() - Finished with {} draw calls", drawCalls);
+        EGRET_DEBUGF("Finished with {} draw calls", drawCalls);
         return drawCalls;
     }
     
@@ -167,15 +167,15 @@ namespace sys {
     // ========== 私有渲染方法实现 ==========
     
     int SkiaRenderer::drawDisplayObject(DisplayObject* displayObject, SkCanvas* canvas, double offsetX, double offsetY, bool isStage) {
-        EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Starting: offsetX={}, offsetY={}, isStage={}", 
+        EGRET_DEBUGF("Start: offsetX={}, offsetY={}, isStage={}", 
                     offsetX, offsetY, isStage);
         
         if (!displayObject || !canvas) {
-            EGRET_WARN("SkiaRenderer::drawDisplayObject() - displayObject or canvas is null");
+            EGRET_WARN("displayObject or canvas is null");
             return 0;
         }
         
-        EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - DisplayObject: x={}, y={}, visible={}", 
+        EGRET_DEBUGF("DisplayObject: x={}, y={}, visible={}", 
                     displayObject->getX(), displayObject->getY(), displayObject->getVisible());
         
         int drawCalls = 0;
@@ -184,24 +184,24 @@ namespace sys {
         // 获取显示列表或渲染节点
         auto displayList = displayObject->getDisplayList();
         if (displayList && !isStage) {
-            EGRET_DEBUG("SkiaRenderer::drawDisplayObject() - Object has DisplayList (container)");
+            EGRET_DEBUG("Has DisplayList (container)");
             // 容器对象：检查是否需要重绘到自己的缓存
             if (displayObject->isCacheDirty() || displayObject->isRenderDirty()) {
-                EGRET_DEBUG("SkiaRenderer::drawDisplayObject() - Container is dirty, redrawing DisplayList");
+                EGRET_DEBUG("Container dirty, redraw DisplayList");
                 drawCalls += displayList->drawToSurface();
             }
             node = displayList->getRenderNode().get();
         } else {
-            EGRET_DEBUG("SkiaRenderer::drawDisplayObject() - Getting direct RenderNode");
+            EGRET_DEBUG("Get direct RenderNode");
             // 普通显示对象：直接获取RenderNode
             node = displayObject->getRenderNode().get();
         }
         
         if (node) {
-            EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Found RenderNode of type: {}", 
+            EGRET_DEBUGF("RenderNode type: {}", 
                         static_cast<int>(node->getType()));
         } else {
-            EGRET_DEBUG("SkiaRenderer::drawDisplayObject() - No RenderNode found");
+            EGRET_DEBUG("No RenderNode");
         }
         
         // 清除脏标记
@@ -209,13 +209,12 @@ namespace sys {
         
         // 渲染当前对象的RenderNode
         if (node) {
-            EGRET_DEBUG("SkiaRenderer::drawDisplayObject() - Rendering RenderNode");
-            drawCalls++;
+            EGRET_DEBUG("RenderNode begin");
             canvas->save();
             canvas->translate(SkDoubleToScalar(offsetX), SkDoubleToScalar(offsetY));
             
             int nodeDrawCalls = renderNode(node, canvas, false);
-            EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - RenderNode returned {} draw calls", nodeDrawCalls);
+            EGRET_DEBUGF("RenderNode drawCalls={}", nodeDrawCalls);
             drawCalls += nodeDrawCalls;
             
             canvas->restore();
@@ -225,21 +224,21 @@ namespace sys {
         auto container = dynamic_cast<DisplayObjectContainer*>(displayObject);
         if (container) {
             int numChildren = container->getNumChildren();
-            EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Container has {} children", numChildren);
+            EGRET_DEBUGF("Children: {}", numChildren);
             
             for (int i = 0; i < numChildren; i++) {
                 auto child = container->getChildAt(i);
                 if (!child) {
-                    EGRET_WARNF("SkiaRenderer::drawDisplayObject() - Child {} is null", i);
+                    EGRET_WARNF("Child {} is null", i);
                     continue;
                 }
                 
                 if (!child->getVisible()) {
-                    EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Child {} is not visible, skipping", i);
+                    EGRET_DEBUGF("Child {} not visible, skip", i);
                     continue;
                 }
                 
-                EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Rendering child {}: x={}, y={}", 
+                EGRET_DEBUGF("Render child {}: x={}, y={}", 
                            i, child->getX(), child->getY());
                 
                 // 计算子对象变换
@@ -247,7 +246,7 @@ namespace sys {
                 
                 double childOffsetX, childOffsetY;
                 if (child->shouldUseTransform()) {
-                    EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Child {} uses transform matrix", i);
+                    EGRET_DEBUGF("Child {} uses transform matrix", i);
                     // 使用完整变换矩阵
                     Matrix matrix = child->getMatrix();
                     SkMatrix childMatrix;
@@ -261,35 +260,35 @@ namespace sys {
                     childOffsetX = -child->getAnchorOffsetX();
                     childOffsetY = -child->getAnchorOffsetY();
                 } else {
-                    EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Child {} uses simple translation", i);
+                    EGRET_DEBUGF("Child {} uses simple translation", i);
                     // 简单偏移
                     childOffsetX = offsetX + child->getX() - child->getAnchorOffsetX();
                     childOffsetY = offsetY + child->getY() - child->getAnchorOffsetY();
                 }
                 
-                EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Child {} final offsets: x={}, y={}", 
+                EGRET_DEBUGF("Child {} offsets: x={}, y={}", 
                            i, childOffsetX, childOffsetY);
                 
                 // 处理透明度
                 if (child->getAlpha() < 1.0) {
-                    EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Child {} has alpha={}", 
+                    EGRET_DEBUGF("Child {} alpha={}", 
                                i, child->getAlpha());
                     canvas->saveLayerAlpha(nullptr, static_cast<U8CPU>(child->getAlpha() * 255));
                 }
                 
                 // 递归调用
                 int childDrawCalls = drawDisplayObject(child, canvas, childOffsetX, childOffsetY, false);
-                EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Child {} returned {} draw calls", 
+                EGRET_DEBUGF("Child {} drawCalls={}", 
                            i, childDrawCalls);
                 drawCalls += childDrawCalls;
                 
                 canvas->restore();
             }
         } else {
-            EGRET_DEBUG("SkiaRenderer::drawDisplayObject() - Object is not a container");
+            EGRET_DEBUG("Not a container");
         }
         
-        EGRET_DEBUGF("SkiaRenderer::drawDisplayObject() - Completed with {} total draw calls", drawCalls);
+        EGRET_DEBUGF("Total drawCalls={}", drawCalls);
         return drawCalls;
     }
     

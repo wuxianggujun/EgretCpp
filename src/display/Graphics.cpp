@@ -9,6 +9,8 @@
 #include <cmath>
 #include <algorithm>
 #include <limits>
+#include <sstream>
+#include <iomanip>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -24,10 +26,10 @@ namespace egret {
     // ========== Graphics类实现 ==========
     
     Graphics::Graphics() {
-        EGRET_DEBUG("Graphics::Graphics() - Creating Graphics object");
+        EGRET_DEBUG("Creating Graphics object");
         // 创建GraphicsNode渲染节点
         m_renderNode = std::make_shared<sys::GraphicsNode>();
-        EGRET_DEBUG("Graphics::Graphics() - GraphicsNode created successfully");
+        EGRET_DEBUG("GraphicsNode created successfully");
     }
 
     Graphics::~Graphics() {
@@ -38,7 +40,12 @@ namespace egret {
     // ========== 填充样式方法 ==========
     
     void Graphics::beginFill(uint32_t color, double alpha) {
-        EGRET_DEBUGF("Graphics::beginFill() - color=0x{:X}, alpha={}", color, alpha);
+        // 规范格式化输出：用十六进制6位颜色
+        {
+            std::ostringstream __oss;
+            __oss << std::uppercase << std::hex << std::setw(6) << std::setfill('0') << (color & 0xFFFFFF);
+            EGRET_DEBUGF("color=0x{}, alpha={}", __oss.str(), alpha);
+        }
         
         color = color & 0xFFFFFF;  // 确保颜色在有效范围内
         alpha = std::clamp(alpha, 0.0, 1.0);  // 限制alpha范围
@@ -48,14 +55,14 @@ namespace egret {
                                            std::static_pointer_cast<sys::Path2D>(m_strokePath));
         
         if (m_fillPath) {
-            EGRET_DEBUG("Graphics::beginFill() - Fill path created successfully");
+            EGRET_DEBUG("Fill path created");
         } else {
-            EGRET_WARN("Graphics::beginFill() - Failed to create fill path");
+            EGRET_WARN("Failed to create fill path");
         }
         
         // 如果已有绘制数据，将当前位置移动到填充路径
         if (!m_renderNode->getDrawData().empty()) {
-            EGRET_DEBUGF("Graphics::beginFill() - Moving to current position ({}, {})", m_lastX, m_lastY);
+            EGRET_DEBUGF("MoveTo current ({}, {})", m_lastX, m_lastY);
             m_fillPath->moveTo(m_lastX, m_lastY);
         }
     }
@@ -175,28 +182,28 @@ namespace egret {
     }
 
     void Graphics::drawCircle(double x, double y, double radius) {
-        EGRET_DEBUGF("Graphics::drawCircle() - x={}, y={}, radius={}", x, y, radius);
+        EGRET_DEBUGF("x={}, y={}, radius={}", x, y, radius);
         
         // 处理NaN和默认值
         if (std::isnan(x)) x = 0;
         if (std::isnan(y)) y = 0;
         if (std::isnan(radius)) radius = 0;
         
-        EGRET_DEBUGF("Graphics::drawCircle() - After NaN check: x={}, y={}, radius={}", x, y, radius);
+        EGRET_DEBUGF("normalized: x={}, y={}, radius={}", x, y, radius);
         
         // 绘制到填充路径和线条路径
         if (m_fillPath) {
-            EGRET_DEBUG("Graphics::drawCircle() - Drawing to fill path");
+            EGRET_DEBUG("Draw to fill path");
             m_fillPath->drawCircle(x, y, radius);
         } else {
-            EGRET_WARN("Graphics::drawCircle() - No fill path available");
+            EGRET_WARN("No fill path available");
         }
         
         if (m_strokePath) {
-            EGRET_DEBUG("Graphics::drawCircle() - Drawing to stroke path");
+            EGRET_DEBUG("Draw to stroke path");
             m_strokePath->drawCircle(x, y, radius);
         } else {
-            EGRET_DEBUG("Graphics::drawCircle() - No stroke path (normal for filled shapes)");
+            EGRET_DEBUG("No stroke path (normal for filled shapes)");
         }
         
         // 扩展边界（+/-1 +2 解决WebGL裁切问题）
@@ -204,16 +211,16 @@ namespace egret {
         extendBoundsByPoint(x + radius + 2, y + radius + 2);
         updatePosition(x + radius, y);
         
-        EGRET_DEBUG("Graphics::drawCircle() - Calling dirty() to mark for redraw");
+        EGRET_DEBUG("Mark dirty");
         dirty();
         
         // 检查GraphicsNode的绘制数据
         if (m_renderNode) {
             const auto& drawData = m_renderNode->getDrawData();
-            EGRET_DEBUGF("Graphics::drawCircle() - GraphicsNode now has {} draw data entries", drawData.size());
+            EGRET_DEBUGF("GraphicsNode drawData={} entries", drawData.size());
         }
         
-        EGRET_DEBUG("Graphics::drawCircle() - Circle drawing completed");
+        EGRET_DEBUG("Circle done");
     }
 
     void Graphics::drawEllipse(double x, double y, double width, double height) {
@@ -429,12 +436,11 @@ namespace egret {
     // ========== 内部系统方法 ==========
     
     void Graphics::setTarget(DisplayObject* target) {
-        EGRET_DEBUGF("Graphics::setTarget() - Setting target to DisplayObject at address: {}", 
-                    target ? "valid" : "null");
+        EGRET_DEBUGF("setTarget: {}", target ? "valid" : "null");
         
         // 清除旧绑定
         if (m_targetDisplay) {
-            EGRET_DEBUG("Graphics::setTarget() - Clearing old target binding");
+            EGRET_DEBUG("Clear old target binding");
             // 明确指定RenderNode类型以避免重载二义性
             std::shared_ptr<sys::RenderNode> nullNode = nullptr;
             m_targetDisplay->setRenderNode(nullNode);
@@ -442,15 +448,15 @@ namespace egret {
         
         // 核心修复：直接赋值GraphicsNode到目标对象
         if (target) {
-            EGRET_DEBUG("Graphics::setTarget() - Assigning GraphicsNode to target");
+            EGRET_DEBUG("Assign GraphicsNode to target");
             target->setRenderNode(m_renderNode);
             
             // 检查GraphicsNode是否有绘制数据
             if (m_renderNode) {
                 const auto& drawData = m_renderNode->getDrawData();
-                EGRET_DEBUGF("Graphics::setTarget() - GraphicsNode has {} draw data entries", drawData.size());
+                EGRET_DEBUGF("GraphicsNode drawData={} entries", drawData.size());
             } else {
-                EGRET_WARN("Graphics::setTarget() - m_renderNode is null!");
+                EGRET_WARN("m_renderNode is null!");
             }
         }
         
@@ -458,12 +464,12 @@ namespace egret {
         m_targetDisplay = target;
         m_targetIsSprite = dynamic_cast<Sprite*>(target) != nullptr;
         
-        EGRET_DEBUGF("Graphics::setTarget() - Target is Sprite: {}", m_targetIsSprite);
+        EGRET_DEBUGF("Target is Sprite: {}", m_targetIsSprite);
         
         // 标记需要重绘
         dirty();
         
-        EGRET_DEBUG("Graphics::setTarget() - Target assignment completed");
+        EGRET_DEBUG("Target assignment done");
     }
 
     void Graphics::onRemoveFromStage() {

@@ -1,5 +1,6 @@
 #include "utils/CallLater.hpp"
 #include <iostream>
+#include "utils/Logger.hpp"
 
 namespace egret {
 namespace CallLaterSystem {
@@ -39,7 +40,7 @@ namespace CallLaterSystem {
                 }
             }
             catch (const std::exception& e) {
-                std::cerr << "Error in callLater function: " << e.what() << std::endl;
+                EGRET_ERRORF("callLater执行出错: {}", e.what());
             }
         }
     }
@@ -61,7 +62,7 @@ namespace CallLaterSystem {
                 }
             }
             catch (const std::exception& e) {
-                std::cerr << "Error in callAsync function: " << e.what() << std::endl;
+                EGRET_ERRORF("callAsync执行出错: {}", e.what());
             }
         }
     }

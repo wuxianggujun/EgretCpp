@@ -3,6 +3,7 @@
 #include "events/Event.hpp"
 #include "events/KeyboardEvent.hpp"
 #include <iostream>
+#include "utils/Logger.hpp"
 
 namespace egret {
 namespace platform {
@@ -56,14 +57,14 @@ namespace platform {
             case SDL_EVENT_MOUSE_BUTTON_DOWN:
                 if (sdlEvent.button.button == SDL_BUTTON_LEFT) {
                     touchEvent = createTouchEvent(TouchEvent::TOUCH_BEGIN, x, y);
-                    std::cout << "Mouse down converted to TOUCH_BEGIN at (" << x << ", " << y << ")" << std::endl;
+                    EGRET_DEBUGF("Mouse->TOUCH_BEGIN ({}, {})", x, y);
                 }
                 break;
                 
             case SDL_EVENT_MOUSE_BUTTON_UP:
                 if (sdlEvent.button.button == SDL_BUTTON_LEFT) {
                     touchEvent = createTouchEvent(TouchEvent::TOUCH_END, x, y);
-                    std::cout << "Mouse up converted to TOUCH_END at (" << x << ", " << y << ")" << std::endl;
+                    EGRET_DEBUGF("Mouse->TOUCH_END ({}, {})", x, y);
                 }
                 break;
                 
@@ -101,12 +102,12 @@ namespace platform {
         switch (sdlEvent.type) {
             case SDL_EVENT_FINGER_DOWN:
                 touchEvent = createTouchEvent(TouchEvent::TOUCH_BEGIN, x, y, touchId);
-                std::cout << "Finger down at (" << x << ", " << y << ") ID: " << touchId << std::endl;
+                EGRET_DEBUGF("Finger DOWN ({}, {}), id={}", x, y, touchId);
                 break;
                 
             case SDL_EVENT_FINGER_UP:
                 touchEvent = createTouchEvent(TouchEvent::TOUCH_END, x, y, touchId);
-                std::cout << "Finger up at (" << x << ", " << y << ") ID: " << touchId << std::endl;
+                EGRET_DEBUGF("Finger UP ({}, {}), id={}", x, y, touchId);
                 break;
                 
             case SDL_EVENT_FINGER_MOTION:
@@ -135,15 +136,11 @@ namespace platform {
         
         // 输出调试信息
         std::string eventType = (sdlEvent.type == SDL_EVENT_KEY_DOWN) ? "KEY_DOWN" : "KEY_UP";
-        std::cout << "Keyboard event: " << eventType
-                  << ", Key: " << keyboardEvent->getKeyName()
-                  << ", KeyCode: " << keyboardEvent->getKeyCode()
-                  << ", CharCode: " << keyboardEvent->getCharCode();
-        
-        if (keyboardEvent->getCtrlKey()) std::cout << " [Ctrl]";
-        if (keyboardEvent->getAltKey()) std::cout << " [Alt]";
-        if (keyboardEvent->getShiftKey()) std::cout << " [Shift]";
-        std::cout << std::endl;
+        EGRET_DEBUGF("Keyboard {}: key={} code={} char={}{}{}{}", eventType,
+                     keyboardEvent->getKeyName(), keyboardEvent->getKeyCode(), keyboardEvent->getCharCode(),
+                     keyboardEvent->getCtrlKey() ? " [Ctrl]" : "",
+                     keyboardEvent->getAltKey() ? " [Alt]" : "",
+                     keyboardEvent->getShiftKey() ? " [Shift]" : "");
         
         // 派发事件到舞台
         bool result = m_stage->dispatchEvent(*keyboardEvent);
@@ -156,27 +153,26 @@ namespace platform {
         
         switch (sdlEvent.type) {
             case SDL_EVENT_WINDOW_RESIZED: {
-                // 更新舞台尺寸
+                // 同步舞台与渲染缓冲尺寸
                 int newWidth = sdlEvent.window.data1;
                 int newHeight = sdlEvent.window.data2;
-                m_stage->setStageWidth(newWidth);
-                m_stage->setStageHeight(newHeight);
-                
+                // 统一调用Stage::resize以确保DisplayList的RenderBuffer同步调整
+                m_stage->resize(newWidth, newHeight);
+
                 // 派发RESIZE事件
                 event = std::make_shared<Event>(Event::RESIZE);
-                std::cout << "Window resized, dispatching RESIZE event: " 
-                          << newWidth << "x" << newHeight << std::endl;
+                EGRET_INFOF("窗口Resize事件: {}x{}", newWidth, newHeight);
                 break;
             }
                 
             case SDL_EVENT_WINDOW_FOCUS_GAINED:
                 event = std::make_shared<Event>(Event::ACTIVATE);
-                std::cout << "Window gained focus, dispatching ACTIVATE event" << std::endl;
+                EGRET_INFO("窗口获得焦点，派发ACTIVATE事件");
                 break;
                 
             case SDL_EVENT_WINDOW_FOCUS_LOST:
                 event = std::make_shared<Event>(Event::DEACTIVATE);
-                std::cout << "Window lost focus, dispatching DEACTIVATE event" << std::endl;
+                EGRET_INFO("窗口失去焦点，派发DEACTIVATE事件");
                 break;
         }
         

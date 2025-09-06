@@ -1,5 +1,6 @@
 #include "player/SimpleFPSDisplay.hpp"
 #include <iostream>
+#include "utils/Logger.hpp"
 #include <algorithm>
 #include <regex>
 #include <iomanip>
@@ -76,7 +77,7 @@ namespace sys {
             return;
         }
         
-        std::cout << "[INFO] " << info << std::endl;
+        EGRET_INFO(info);
         
         // 保存到历史记录（限制数量）
         m_infoLines.push_back("[INFO] " + info);
@@ -94,7 +95,7 @@ namespace sys {
             return;
         }
         
-        std::cout << "\033[33m[WARN] " << info << "\033[0m" << std::endl; // 黄色输出
+        EGRET_WARN(info);
         
         m_infoLines.push_back("[WARN] " + info);
         if (m_infoLines.size() > 100) {
@@ -111,7 +112,7 @@ namespace sys {
             return;
         }
         
-        std::cout << "\033[31m[ERROR] " << info << "\033[0m" << std::endl; // 红色输出
+        EGRET_ERROR(info);
         
         m_infoLines.push_back("[ERROR] " + info);
         if (m_infoLines.size() > 100) {
@@ -137,13 +138,8 @@ namespace sys {
     
     void SimpleFPSDisplay::outputFPSInfo() const {
         // 在控制台输出FPS信息
-        std::cout << "\033[32m" // 绿色
-                  << "=== FPS Info ===" << std::endl
-                  << "FPS: " << std::setw(3) << m_currentFPS << " | "
-                  << "Draw: " << std::setw(3) << m_currentDrawCalls << " | "
-                  << "Render: " << std::setw(3) << m_currentCostRender << "ms | "
-                  << "Ticker: " << std::setw(3) << m_currentCostTicker << "ms"
-                  << "\033[0m" << std::endl; // 重置颜色
+        EGRET_INFOF("[FPS] fps={} drawCalls={} render={}ms ticker={}ms",
+                     m_currentFPS, m_currentDrawCalls, m_currentCostRender, m_currentCostTicker);
     }
 
 } // namespace sys

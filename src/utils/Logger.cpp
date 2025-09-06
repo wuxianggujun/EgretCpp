@@ -207,7 +207,8 @@ void Logger::doLog(Level level, const std::string& message, const char* file, in
     if (file && line > 0) {
         locationStr << "[" << file << ":" << line;
         if (func) {
-            locationStr << " in " << func << "()";
+            std::string shortFunc = simplifyFunction(func);
+            locationStr << " in " << shortFunc << "()";
         }
         locationStr << "] ";
     }
@@ -219,6 +220,23 @@ void Logger::doLog(Level level, const std::string& message, const char* file, in
            << locationStr.str()
            << message 
            << resetCode << std::endl;
+}
+
+std::string Logger::simplifyFunction(const char* func) {
+    if (!func) return "";
+    std::string name(func);
+    // 去掉参数签名（如果宏传入带括号的变体）
+    // 这里只保留函数名主体，括号由打印逻辑统一追加
+    size_t parenPos = name.find('(');
+    if (parenPos != std::string::npos) {
+        name = name.substr(0, parenPos);
+    }
+    // 去掉命名空间/类限定
+    size_t pos = name.rfind("::");
+    if (pos != std::string::npos) {
+        name = name.substr(pos + 2);
+    }
+    return name;
 }
 
 } // namespace egret

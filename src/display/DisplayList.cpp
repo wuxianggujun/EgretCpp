@@ -14,50 +14,50 @@ namespace sys {
     }
     
     int DisplayList::drawToSurface() {
-        EGRET_DEBUG("DisplayList::drawToSurface() - Starting");
+        EGRET_DEBUG("Starting");
         
         if (!m_renderBuffer) {
-            EGRET_WARN("DisplayList::drawToSurface() - renderBuffer is null");
+            EGRET_WARN("renderBuffer is null");
             return 0;
         }
         
         if (!systemRenderer) {
-            EGRET_ERROR("DisplayList::drawToSurface() - systemRenderer is null! Call initializeRenderers() first.");
+            EGRET_ERROR("systemRenderer is null! Call initializeRenderers() first.");
             return 0;
         }
         
         if (!m_root) {
-            EGRET_WARN("DisplayList::drawToSurface() - root is null");
+            EGRET_WARN("root is null");
             return 0;
         }
         
-        EGRET_DEBUGF("DisplayList::drawToSurface() - Root object: x={}, y={}, visible={}", 
+        EGRET_DEBUGF("Root: x={}, y={}, visible={}", 
                     m_root->getX(), m_root->getY(), m_root->getVisible());
         
         // 如果root是DisplayObjectContainer，检查其子对象
         auto container = dynamic_cast<DisplayObjectContainer*>(m_root);
         if (container) {
             int childCount = container->getNumChildren();
-            EGRET_DEBUGF("DisplayList::drawToSurface() - Root container has {} children", childCount);
+            EGRET_DEBUGF("Root children: {}", childCount);
         }
         
         // 清空渲染缓冲区
-        EGRET_DEBUG("DisplayList::drawToSurface() - Clearing render buffer");
+        EGRET_DEBUG("Clear render buffer");
         m_renderBuffer->clear();
         
         // 设置画布缩放（对应TS的canvasScale）
         Matrix offsetMatrix;
         offsetMatrix.setTo(1.0, 0.0, 0.0, 1.0, 0.0, 0.0); // 默认单位矩阵
         
-        EGRET_DEBUG("DisplayList::drawToSurface() - Calling SystemRenderer::render()");
+        EGRET_DEBUG("Call SystemRenderer");
         // 核心修复：调用SystemRenderer.render()递归渲染根对象
         int drawCalls = systemRenderer->render(m_root, m_renderBuffer.get(), offsetMatrix);
         
-        EGRET_DEBUGF("DisplayList::drawToSurface() - SystemRenderer returned {} draw calls", drawCalls);
+        EGRET_DEBUGF("SystemRenderer drawCalls={}", drawCalls);
         
         m_dirty = false;
         
-        EGRET_DEBUG("DisplayList::drawToSurface() - Finished");
+        EGRET_DEBUG("Finished");
         return drawCalls;
     }
     

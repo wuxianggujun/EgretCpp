@@ -5,8 +5,8 @@
 #include "utils/CallLater.hpp"
 #include "utils/Lifecycle.hpp"
 #include <algorithm>
-#include <iostream>
 #include <cmath>
+#include "utils/Logger.hpp"
 
 namespace egret {
 namespace sys {
@@ -27,7 +27,7 @@ namespace sys {
         m_frameDeltaTime = 1000.0 / m_frameRate;
         m_lastCount = m_frameInterval = static_cast<int>(std::round(60000.0 / m_frameRate));
         
-        std::cout << "SystemTicker initialized with frameRate: " << m_frameRate << std::endl;
+        EGRET_INFOF("SystemTicker初始化: frameRate={}", m_frameRate);
     }
     
     void SystemTicker::addPlayer(std::shared_ptr<Player> player) {
@@ -44,7 +44,7 @@ namespace sys {
         // 添加到播放器列表
         m_playerList.push_back(player);
         
-        std::cout << "Player added to ticker. Total players: " << m_playerList.size() << std::endl;
+        EGRET_DEBUGF("添加Player，当前数量={}", m_playerList.size());
     }
     
     void SystemTicker::removePlayer(std::shared_ptr<Player> player) {
@@ -55,7 +55,7 @@ namespace sys {
         auto it = std::find(m_playerList.begin(), m_playerList.end(), player);
         if (it != m_playerList.end()) {
             m_playerList.erase(it);
-            std::cout << "Player removed from ticker. Remaining players: " << m_playerList.size() << std::endl;
+            EGRET_DEBUGF("移除Player，剩余数量={}", m_playerList.size());
         }
     }
     
@@ -75,7 +75,7 @@ namespace sys {
         tickCallback.callback = callback;
         m_callBackList.push_back(tickCallback);
         
-        std::cout << "Tick callback started. Total callbacks: " << m_callBackList.size() << std::endl;
+        EGRET_DEBUGF("启动tick回调，数量={}", m_callBackList.size());
     }
     
     void SystemTicker::stopTick(std::function<bool(long long)> callback) {
@@ -90,7 +90,7 @@ namespace sys {
         
         m_callBackList.erase(m_callBackList.begin() + index);
         
-        std::cout << "Tick callback stopped. Remaining callbacks: " << m_callBackList.size() << std::endl;
+        EGRET_DEBUGF("停止tick回调，剩余数量={}", m_callBackList.size());
     }
     
     int SystemTicker::getTickIndex(const std::function<bool(long long)>& callback) const {
@@ -119,18 +119,18 @@ namespace sys {
         // 使用60*1000来避免浮点数计算不准确的问题
         m_lastCount = m_frameInterval = static_cast<int>(std::round(60000.0 / value));
         
-        std::cout << "Frame rate set to: " << m_frameRate << " (limited to " << value << ")" << std::endl;
+        EGRET_INFOF("设置帧率={} (限制为{})", m_frameRate, value);
         return true;
     }
     
     void SystemTicker::pause() {
         m_isPaused = true;
-        std::cout << "SystemTicker paused" << std::endl;
+        EGRET_INFO("SystemTicker暂停");
     }
     
     void SystemTicker::resume() {
         m_isPaused = false;
-        std::cout << "SystemTicker resumed" << std::endl;
+        EGRET_INFO("SystemTicker恢复");
     }
     
     void SystemTicker::update(bool forceUpdate) {

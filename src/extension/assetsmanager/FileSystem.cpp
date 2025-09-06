@@ -10,6 +10,7 @@
 #include "extension/assetsmanager/Path.hpp"
 #include <vector>
 #include <sstream>
+#include "utils/Logger.hpp"
 
 namespace RES {
 
@@ -24,7 +25,7 @@ namespace RES {
     }
 
     void NewFileSystem::profile() {
-        std::cout << "FileSystem Contents:" << std::endl;
+        EGRET_INFO("FileSystem 内容:");
         printDictionary(m_data);
     }
 
@@ -207,17 +208,19 @@ namespace RES {
         std::string indentStr(indent * 2, ' ');
         
         for (const auto& pair : dict) {
-            std::cout << indentStr << pair.first;
+            // 使用标准输出风格统一日志
+            EGRET_INFOF("{}{}", indentStr, pair.first);
             
             if (pair.second.type() == typeid(Dictionary)) {
-                std::cout << "/" << std::endl;
+                // 目录行
+                EGRET_INFO("/");
                 const Dictionary& subDict = std::any_cast<const Dictionary&>(pair.second);
                 printDictionary(subDict, indent + 1);
             } else if (pair.second.type() == typeid(File)) {
                 const File& file = std::any_cast<const File&>(pair.second);
-                std::cout << " -> " << file.url << " (type: " << file.type << ")" << std::endl;
+                EGRET_INFOF(" -> {} (type: {})", file.url, file.type);
             } else {
-                std::cout << " (unknown type)" << std::endl;
+                EGRET_WARN(" (unknown type)");
             }
         }
     }

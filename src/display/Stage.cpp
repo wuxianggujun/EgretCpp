@@ -113,52 +113,52 @@ namespace egret {
     }
     
     void Stage::buildRenderContent() {
-        EGRET_DEBUG("Stage::buildRenderContent() - Starting");
+        EGRET_DEBUG("Starting");
         
         // 这个方法负责将Stage的所有子对象内容构建到DisplayList中
         // 设置DisplayList的根对象为Stage自身，让渲染器递归处理所有子对象
         
         if (m_displayList) {
-            EGRET_DEBUG("Stage::buildRenderContent() - Setting DisplayList root to Stage");
+            EGRET_DEBUG("Set DisplayList root");
             // 设置DisplayList的根对象为Stage自身
             m_displayList->setRoot(this);
             
             // 检查Stage的子对象数量
             int childCount = getNumChildren();
-            EGRET_DEBUGF("Stage::buildRenderContent() - Stage has {} children", childCount);
+            EGRET_DEBUGF("Children: {}", childCount);
             
             // 打印每个子对象的信息
             for (int i = 0; i < childCount; i++) {
                 auto child = getChildAt(i);
                 if (child) {
-                    EGRET_DEBUGF("Stage::buildRenderContent() - Child {}: x={}, y={}, visible={}", 
+                    EGRET_DEBUGF("Child {}: x={}, y={}, visible={}", 
                                i, child->getX(), child->getY(), child->getVisible());
                     
                     // 检查是否有RenderNode
                     auto renderNode = child->getRenderNode();
                     if (renderNode) {
-                        EGRET_DEBUGF("Stage::buildRenderContent() - Child {} has RenderNode", i);
+                        EGRET_DEBUGF("Child {} has RenderNode", i);
                     } else {
-                        EGRET_WARNF("Stage::buildRenderContent() - Child {} has NO RenderNode!", i);
+                        EGRET_WARNF("Child {} has NO RenderNode!", i);
                     }
                 } else {
-                    EGRET_WARNF("Stage::buildRenderContent() - Child {} is null!", i);
+                    EGRET_WARNF("Child {} is null!", i);
                 }
             }
             
             // Stage的RenderNode通常是GroupNode或空
             if (!getRenderNode()) {
-                EGRET_DEBUG("Stage::buildRenderContent() - Stage has no RenderNode (normal for Stage)");
+                EGRET_DEBUG("No RenderNode (normal for Stage)");
                 // 为Stage创建一个基本的RenderNode，如果还没有的话
                 // 通常Stage不需要特殊的RenderNode，由渲染器处理
             } else {
-                EGRET_DEBUG("Stage::buildRenderContent() - Stage has RenderNode");
+                EGRET_DEBUG("Has RenderNode");
             }
         } else {
-            EGRET_ERROR("Stage::buildRenderContent() - DisplayList is null!");
+            EGRET_ERROR("DisplayList is null!");
         }
         
-        EGRET_DEBUG("Stage::buildRenderContent() - Finished");
+        EGRET_DEBUG("Finished");
     }
 
     void Stage::resize(double width, double height) {
