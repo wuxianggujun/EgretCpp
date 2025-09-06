@@ -3,6 +3,7 @@
 #include "sys/Screen.hpp"
 #include "display/DisplayList.hpp"
 #include "player/RenderBuffer.hpp"
+#include "player/SystemTicker.hpp"
 #include "utils/Logger.hpp"
 #include <algorithm>
 
@@ -32,9 +33,10 @@ namespace egret {
         
         s_globalFrameRate = value;
         m_frameRate = value;
-        
-        // TODO: 这里需要通知渲染系统更新帧率
-        // 在完整实现中，这里会调用 ticker.$setFrameRate(value);
+
+        // 对齐TS实现：修改Stage的frameRate会同步修改全局ticker的帧率
+        // 对应 TS: ticker.$setFrameRate(value)
+        egret::sys::getTicker().setFrameRate(static_cast<int>(std::round(value)));
     }
 
     // ========== 缩放模式实现 ==========

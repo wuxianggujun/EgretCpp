@@ -11,6 +11,7 @@
 #include <string>
 #include <memory>
 #include <sstream>
+#include <fstream>
 
 namespace egret {
 
@@ -97,6 +98,18 @@ public:
      * @return 当前日志级别字符串
      */
     static std::string getLogLevelString();
+
+    /**
+     * 设置日志文件输出
+     * @param filepath 日志文件路径
+     * @param append 是否追加写入
+     */
+    static void setLogFile(const std::string& filepath, bool append = true);
+
+    /**
+     * 启用/禁用控制台输出
+     */
+    static void setConsoleEnabled(bool enabled);
 
     // ========== 日志输出方法 ==========
     
@@ -240,6 +253,9 @@ private:
      * @brief 是否已初始化
      */
     static bool s_initialized;
+    static bool s_consoleEnabled;
+    static bool s_logToFile;
+    static std::ofstream s_logFile;
     
     /**
      * @brief 初始化日志系统

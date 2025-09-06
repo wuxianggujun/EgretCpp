@@ -81,7 +81,13 @@ namespace platform {
         }
         
         if (touchEvent) {
-            m_stage->dispatchEvent(*touchEvent);
+            // 命中测试，优先派发给命中的显示对象
+            if (auto target = m_stage->hitTest(x, y)) {
+                target->dispatchEvent(*touchEvent);
+            }
+            // 同时派发到Stage，便于全局监听（无冒泡模型的兼容）
+            auto stageEvent = std::make_shared<TouchEvent>(touchEvent->getType(), true, true, x, y, 0);
+            m_stage->dispatchEvent(*stageEvent);
             return true;
         }
         
@@ -116,7 +122,13 @@ namespace platform {
         }
         
         if (touchEvent) {
-            m_stage->dispatchEvent(*touchEvent);
+            // 命中测试，优先派发给命中的显示对象
+            if (auto target = m_stage->hitTest(x, y)) {
+                target->dispatchEvent(*touchEvent);
+            }
+            // 同时派发到Stage，便于全局监听（无冒泡模型的兼容）
+            auto stageEvent = std::make_shared<TouchEvent>(touchEvent->getType(), true, true, x, y, touchId);
+            m_stage->dispatchEvent(*stageEvent);
             return true;
         }
         
@@ -186,14 +198,10 @@ namespace platform {
     
     std::shared_ptr<TouchEvent> SDLEventConverter::createTouchEvent(
         const std::string& type, float x, float y, int touchId) {
-        
-        auto touchEvent = std::make_shared<TouchEvent>(type);
-        
-        // TODO: 当TouchEvent实现后，设置这些属性
-        // touchEvent->setStageX(x);
-        // touchEvent->setStageY(y);
-        // touchEvent->setTouchPointID(touchId);
-        
+        // bubbles / cancelable 设为 true 以便更接近 Egret 行为
+        auto touchEvent = std::make_shared<TouchEvent>(type, true, true, x, y, touchId);
+        bool down = (type == TouchEvent::TOUCH_BEGIN || type == TouchEvent::TOUCH_MOVE);
+        touchEvent->setTouchDown(down);
         return touchEvent;
     }
     

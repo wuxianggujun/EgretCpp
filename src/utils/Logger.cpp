@@ -18,6 +18,9 @@ namespace egret {
 
 Logger::Level Logger::s_currentLevel = Level::INFO;
 bool Logger::s_initialized = false;
+bool Logger::s_consoleEnabled = true;
+bool Logger::s_logToFile = false;
+std::ofstream Logger::s_logFile;
 
 // ========== TypeScript兼容的字符串常量定义 ==========
 
@@ -53,6 +56,26 @@ Logger::Level Logger::getLogLevel() {
 
 std::string Logger::getLogLevelString() {
     return levelToString(getLogLevel());
+}
+
+void Logger::setLogFile(const std::string& filepath, bool append) {
+    if (!s_initialized) {
+        initialize();
+    }
+    if (s_logFile.is_open()) {
+        s_logFile.close();
+    }
+    std::ios_base::openmode mode = std::ios::out;
+    if (append) mode |= std::ios::app;
+    s_logFile.open(filepath, mode);
+    s_logToFile = s_logFile.is_open();
+    if (!s_logToFile) {
+        std::cerr << "[EGRET] Failed to open log file: " << filepath << std::endl;
+    }
+}
+
+void Logger::setConsoleEnabled(bool enabled) {
+    s_consoleEnabled = enabled;
 }
 
 // ========== 日志输出方法实现 ==========
@@ -199,9 +222,6 @@ void Logger::doLog(Level level, const std::string& message, const char* file, in
             break;
     }
     
-    // 选择输出流
-    std::ostream& output = (level >= Level::WARN) ? std::cerr : std::cout;
-    
     // 构建位置信息字符串
     std::ostringstream locationStr;
     if (file && line > 0) {
@@ -212,14 +232,29 @@ void Logger::doLog(Level level, const std::string& message, const char* file, in
         }
         locationStr << "] ";
     }
-    
-    // 输出格式：[时间] [级别] [文件:行号 in 函数()] 消息
-    output << colorCode 
-           << "[" << timeStr.str() << "] "
-           << "[" << std::setw(5) << levelStr << "] "
-           << locationStr.str()
-           << message 
-           << resetCode << std::endl;
+
+    // 构建无颜色的完整行（便于写入文件）
+    std::ostringstream plainLine;
+    plainLine << "[" << timeStr.str() << "] "
+              << "[" << levelStr << "] "
+              << locationStr.str() << message;
+
+    // 控制台输出
+    if (s_consoleEnabled) {
+        std::ostream& output = (level >= Level::WARN) ? std::cerr : std::cout;
+        output << colorCode
+               << "[" << timeStr.str() << "] "
+               << "[" << levelStr << "] "
+               << locationStr.str()
+               << message
+               << resetCode << std::endl;
+    }
+
+    // 文件输出
+    if (s_logToFile && s_logFile.is_open()) {
+        s_logFile << plainLine.str() << std::endl;
+        s_logFile.flush();
+    }
 }
 
 std::string Logger::simplifyFunction(const char* func) {

@@ -397,8 +397,10 @@ namespace egret {
     }
 
     Rectangle DisplayObject::getMeasuredBounds() {
-        // 默认返回空矩形，子类应该重写这个方法
-        return Rectangle(0, 0, 0, 0);
+        // 默认实现：调用虚函数 measureContentBounds 由子类填充内容边界
+        Rectangle bounds;
+        measureContentBounds(bounds);
+        return bounds;
     }
     
     // ========== 智能指针版本的边界计算实现 ==========
@@ -409,8 +411,12 @@ namespace egret {
     }
     
     std::shared_ptr<Rectangle> DisplayObject::getMeasuredBounds() const {
-        // 默认返回空矩形，子类应该重写这个方法
-        return Rectangle::create(0, 0, 0, 0);
+        // 调用非 const 版本以复用测量逻辑
+        auto r = Rectangle::create();
+        // const_cast 安全：仅用于读取测量数据
+        Rectangle measured = const_cast<DisplayObject*>(this)->getMeasuredBounds();
+        r->copyFrom(measured);
+        return r;
     }
     
     // ========== 渲染相关方法实现 ==========
