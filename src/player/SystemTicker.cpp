@@ -1,5 +1,7 @@
 #include "player/SystemTicker.hpp"
 #include "display/DisplayObject.hpp"
+#include "display/DisplayObjectContainer.hpp"
+#include "display/Stage.hpp"
 #include "events/Event.hpp"
 #include "utils/Timer.hpp"
 #include "utils/CallLater.hpp"
@@ -217,21 +219,29 @@ namespace sys {
     }
     
     void SystemTicker::broadcastEnterFrame() {
-        // TODO: 实现EnterFrame事件广播
-        // 这需要DisplayObject的静态回调列表支持
-        // 暂时留空，等DisplayObject系统完善后实现
-        
-        /* 原TypeScript代码：
-        let list: any[] = DisplayObject.$enterFrameCallBackList;
-        let length = list.length;
-        if (length == 0) {
+        if (m_playerList.empty()) {
             return;
         }
-        list = list.concat();
-        for (let i = 0; i < length; i++) {
-            list[i].dispatchEventWith(Event.ENTER_FRAME);
+
+        // 深度优先遍历显示树，向每个显示对象派发 ENTER_FRAME
+        auto dispatchTree = [](egret::DisplayObject* obj, egret::Event& evt, auto&& dispatchTreeRef) -> void {
+            if (!obj) return;
+            obj->dispatchEvent(evt);
+            if (auto container = dynamic_cast<egret::DisplayObjectContainer*>(obj)) {
+                int n = container->getNumChildren();
+                for (int i = 0; i < n; ++i) {
+                    dispatchTreeRef(container->getChildAt(i), evt, dispatchTreeRef);
+                }
+            }
+        };
+
+        egret::Event enter(Event::ENTER_FRAME);
+        for (auto& player : m_playerList) {
+            if (!player) continue;
+            auto stage = player->getStage();
+            if (!stage) continue;
+            dispatchTree(stage.get(), enter, dispatchTree);
         }
-        */
     }
     
     void SystemTicker::broadcastRender() {

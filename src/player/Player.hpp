@@ -7,6 +7,7 @@
 #include "player/PlayerOption.hpp"
 #include "platform/sdl/SDLWindow.hpp"
 #include "platform/sdl/SDLEventConverter.hpp"
+#include "sys/Screen.hpp"
 #include "../core/HashObject.hpp"
 #include <SDL3/SDL.h>
 #include <memory>
@@ -197,6 +198,9 @@ namespace sys {
         SDL_Texture* m_presentTexture = nullptr;
         int m_presentTexW = 0;
         int m_presentTexH = 0;
+
+        // 屏幕适配与缩放
+        std::unique_ptr<sys::Screen> m_screen;                // 屏幕适配器（由Player持有生命周期）
     };
 
 } // namespace sys

@@ -5,9 +5,11 @@
 #include "Bitmap.hpp"
 #include "Texture.hpp"
 #include "BitmapData.hpp"
+#include "BitmapFillMode.hpp"
 #include "Stage.hpp"
 #include "geom/Rectangle.hpp"
 #include "player/NormalBitmapNode.hpp"
+#include "player/nodes/BitmapNode.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -192,6 +194,45 @@ namespace egret
         }
         
         markRenderDirty();
+    }
+
+    void Bitmap::prepareRenderNode()
+    {
+        auto node = std::dynamic_pointer_cast<sys::NormalBitmapNode>(getRenderNode());
+        if (!node || !m_bitmapData) {
+            return;
+        }
+
+        // 目标尺寸：优先使用显式尺寸，否则使用纹理尺寸
+        double destW = !std::isnan(m_explicitBitmapWidth) ? m_explicitBitmapWidth : m_textureWidth;
+        double destH = !std::isnan(m_explicitBitmapHeight) ? m_explicitBitmapHeight : m_textureHeight;
+
+        // 根据是否有九宫格选择更新方式
+        if (m_scale9Grid) {
+            sys::BitmapNode::updateTextureDataWithScale9Grid(
+                node,
+                m_bitmapData,
+                m_scale9Grid,
+                m_bitmapX, m_bitmapY, m_bitmapWidth, m_bitmapHeight,
+                m_offsetX, m_offsetY,
+                m_textureWidth, m_textureHeight,
+                destW, destH,
+                m_sourceWidth, m_sourceHeight,
+                m_smoothing
+            );
+        } else {
+            sys::BitmapNode::updateTextureData(
+                node,
+                m_bitmapData,
+                m_bitmapX, m_bitmapY, m_bitmapWidth, m_bitmapHeight,
+                m_offsetX, m_offsetY,
+                m_textureWidth, m_textureHeight,
+                destW, destH,
+                m_sourceWidth, m_sourceHeight,
+                BitmapFillMode::SCALE,
+                m_smoothing
+            );
+        }
     }
     
     // ========== 私有辅助方法实现 ==========

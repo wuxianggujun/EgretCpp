@@ -8,6 +8,7 @@
 namespace egret {
     // 前向声明
     class DisplayObject;
+    class BitmapData;
     
 namespace sys {
 
@@ -44,6 +45,11 @@ namespace sys {
          * 清空渲染缓冲
          */
         virtual void renderClear() = 0;
+
+        /**
+         * 使渲染器缓存的位图数据失效（可选实现）
+         */
+        virtual void invalidateBitmapData(BitmapData* /*bmp*/) {}
     };
 
     // ========== 全局渲染器实例 ==========

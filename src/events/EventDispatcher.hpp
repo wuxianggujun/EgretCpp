@@ -5,6 +5,7 @@
 #pragma once
 #include <map>
 #include <string>
+#include <unordered_set>
 
 #include "events/IEventDispatcher.hpp"
 
@@ -31,6 +32,9 @@ namespace egret
             std::map<std::string, std::vector<EventBin>> eventsMap;
             std::map<std::string, std::vector<EventBin>> captureEventsMap;
             int notifyLevel;
+            // 在一次派发期间，哪些 type 已经克隆过，避免重复复制
+            std::unordered_set<std::string> clonedTypes;
+            std::unordered_set<std::string> clonedCaptureTypes;
         };
 
         EventDispatcherData m_eventDispatcher;

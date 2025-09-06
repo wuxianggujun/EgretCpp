@@ -54,8 +54,10 @@ namespace egret {
         // 通过GraphicsNode创建填充路径（StrokePath转换为Path2D基类指针）
         m_fillPath = m_renderNode->beginFill(color, alpha, 
                                            std::static_pointer_cast<sys::Path2D>(m_strokePath));
-        
+
         if (m_fillPath) {
+            // 应用填充规则
+            m_fillPath->setFillEvenOdd(m_fillEvenOddFlag);
             EGRET_DEBUG("Fill path created");
         } else {
             EGRET_WARN("Failed to create fill path");
@@ -83,10 +85,13 @@ namespace egret {
         // 通过GraphicsNode创建渐变填充路径
         m_fillPath = m_renderNode->beginGradientFill(type, colors, alphas, convertedRatios, matrix, 
                                                    std::static_pointer_cast<sys::Path2D>(m_strokePath));
-        
+
         // 如果已有绘制数据，将当前位置移动到填充路径
         if (!m_renderNode->getDrawData().empty()) {
             m_fillPath->moveTo(m_lastX, m_lastY);
+        }
+        if (m_fillPath) {
+            m_fillPath->setFillEvenOdd(m_fillEvenOddFlag);
         }
     }
 

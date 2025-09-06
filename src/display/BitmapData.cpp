@@ -4,6 +4,7 @@
 
 #include "BitmapData.hpp"
 #include "DisplayObject.hpp"
+#include "player/SystemRenderer.hpp"
 #include "geom/Rectangle.hpp"
 #include <algorithm>
 #include <cstring>
@@ -11,6 +12,7 @@
 #include <iomanip>
 #include <set>
 #include <map>
+#include <memory>
 
 namespace egret
 {
@@ -362,6 +364,11 @@ namespace egret
                     // obj->markRenderDirty();
                 }
             }
+        }
+
+        // 失效渲染器中的SkImage缓存（如果存在）
+        if (sys::systemRenderer) {
+            sys::systemRenderer->invalidateBitmapData(bitmapData.get());
         }
     }
     

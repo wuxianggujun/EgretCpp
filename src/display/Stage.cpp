@@ -6,6 +6,7 @@
 #include "player/SystemTicker.hpp"
 #include "utils/Logger.hpp"
 #include <algorithm>
+#include <cmath>
 
 namespace egret {
 
@@ -141,7 +142,8 @@ namespace egret {
                     if (renderNode) {
                         EGRET_DEBUGF("Child {} has RenderNode", i);
                     } else {
-                        EGRET_WARNF("Child {} has NO RenderNode!", i);
+                        // 容器通常没有直接的RenderNode，这里降级为调试日志以免误导
+                        EGRET_DEBUGF("Child {} has NO RenderNode (container or deferred)", i);
                     }
                 } else {
                     EGRET_WARNF("Child {} is null!", i);
@@ -164,15 +166,20 @@ namespace egret {
     }
 
     void Stage::resize(double width, double height) {
+        // 优先交由Screen处理，以应用scaleMode/showAll/noScale等逻辑
+        if (m_screen) {
+            m_screen->onWindowResize(width, height);
+            // Screen会通过updatePlayerSize回写stage尺寸，这里只派发事件
+            dispatchResizeEvent();
+            return;
+        }
+
+        // 回退：直接更新舞台与渲染缓冲尺寸
         m_stageWidth = width;
         m_stageHeight = height;
-        
-        // TODO: 调整渲染缓冲区大小
-        // 在完整实现中，这里会调用 this.m_displayList->getRenderBuffer()->resize(width, height);
         if (m_displayList && m_displayList->getRenderBuffer()) {
             m_displayList->getRenderBuffer()->resize(width, height);
         }
-        
         dispatchResizeEvent();
     }
 

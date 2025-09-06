@@ -62,7 +62,18 @@ namespace sys {
             player->displayFPS(option.showFPS, option.showLog, option.logFilter);
         }
         
-        // 更新舞台尺寸
+        // 更新舞台配置（语义对齐Egret）
+        if (auto stage = player->getStage()) {
+            // 设置缩放与方向（会触发Screen.updateScreenSize）
+            stage->setScaleMode(option.scaleMode);
+            stage->setOrientation(option.orientation);
+            // 纹理缩放、触摸、帧率
+            stage->setTextureScaleFactor(option.textureScaleFactor);
+            stage->setMaxTouches(option.maxTouches);
+            stage->setFrameRate(option.frameRate);
+        }
+
+        // 初始化舞台内容尺寸
         player->updateStageSize(option.contentWidth, option.contentHeight);
         
         EGRET_INFOF("Player配置: entryClass={}, size={}x{}, fps={}, scaleMode={}, showFPS={}, showLog={}",
@@ -79,12 +90,12 @@ namespace sys {
         stage->setStageWidth(option.contentWidth);
         stage->setStageHeight(option.contentHeight);
         
-        // TODO: 设置其他舞台属性
-        // stage->setScaleMode(option.scaleMode);
-        // stage->setOrientation(option.orientation);
-        // stage->setMaxTouches(option.maxTouches);
-        // stage->setFrameRate(option.frameRate);
-        // stage->setTextureScaleFactor(option.textureScaleFactor);
+        // 设置其他舞台属性（保持与TS语义对齐）
+        stage->setScaleMode(option.scaleMode);
+        stage->setOrientation(option.orientation);
+        stage->setMaxTouches(option.maxTouches);
+        stage->setFrameRate(option.frameRate);
+        stage->setTextureScaleFactor(option.textureScaleFactor);
         
         EGRET_INFOF("创建默认Stage: {}x{}", option.contentWidth, option.contentHeight);
         

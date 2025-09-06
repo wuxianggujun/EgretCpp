@@ -2,6 +2,7 @@
 #include "display/DisplayObject.hpp"
 #include "display/DisplayObjectContainer.hpp"
 #include "geom/Rectangle.hpp"
+#include "display/Bitmap.hpp"
 #include "sys/GraphicsNode.hpp"
 #include "sys/Path2D.hpp"
 #include "sys/StrokePath.hpp"
@@ -10,6 +11,7 @@
 #include "player/nodes/GroupNode.hpp"
 #include "player/nodes/MeshNode.hpp"
 #include "utils/Logger.hpp"
+#include "display/BitmapData.hpp"
 
 // Skia头文件
 #include <include/core/SkCanvas.h>
@@ -21,6 +23,9 @@
 #include <include/core/SkColor.h>
 #include <include/core/SkBlendMode.h>
 #include <include/effects/SkImageFilters.h>
+#include <include/core/SkData.h>
+#include <include/core/SkSamplingOptions.h>
+#include <include/core/SkImageInfo.h>
 
 #include <algorithm>
 #include <cmath>
@@ -163,6 +168,15 @@ namespace sys {
         // 清空当前状态
         m_currentCanvas = nullptr;
     }
+
+    void SkiaRenderer::invalidateBitmapData(BitmapData* bmp) {
+        if (!bmp) return;
+        const void* key = static_cast<const void*>(bmp);
+        auto it = m_imageCache.find(key);
+        if (it != m_imageCache.end()) {
+            m_imageCache.erase(it);
+        }
+    }
     
     // ========== 私有渲染方法实现 ==========
     
@@ -180,6 +194,11 @@ namespace sys {
         
         int drawCalls = 0;
         RenderNode* node = nullptr;
+
+        // 在渲染当前对象之前，如果是Bitmap，准备其渲染节点数据
+        if (auto bmpSelf = dynamic_cast<Bitmap*>(displayObject)) {
+            bmpSelf->prepareRenderNode();
+        }
         
         // 获取显示列表或渲染节点
         auto displayList = displayObject->getDisplayList();
@@ -206,17 +225,111 @@ namespace sys {
         
         // 清除脏标记
         displayObject->setCacheDirty(false);
-        
-        // 渲染当前对象的RenderNode
+
+        // 处理 Mask/ScrollRect 包裹渲染（与Egret语义对齐）
+        Rectangle* scrollRect = displayObject->getScrollRect();
+        DisplayObject* maskObj = displayObject->getMask();
+        bool hasScroll = (scrollRect != nullptr);
+        bool hasMask = (maskObj != nullptr);
+
+        if ((hasScroll || hasMask) && !isStage) {
+            // 原则：在对象本地坐标系中，按顺序处理 scrollRect（裁剪+平移）、mask（saveLayer + DstIn），再绘制内容
+            canvas->save();
+            canvas->translate(SkDoubleToScalar(offsetX), SkDoubleToScalar(offsetY));
+
+            // 本地递归渲染(忽略mask/scrollRect)的lambda
+            std::function<int(DisplayObject*)> renderRaw = [&](DisplayObject* obj) -> int {
+                int calls = 0;
+                if (!obj) return 0;
+                auto n = obj->getRenderNode().get();
+                if (n) {
+                    calls += renderNode(n, canvas, false);
+                }
+                if (auto ctn = dynamic_cast<DisplayObjectContainer*>(obj)) {
+                    int nchild = ctn->getNumChildren();
+                    for (int i = 0; i < nchild; ++i) {
+                        auto ch = ctn->getChildAt(i);
+                        if (!ch || !ch->getVisible()) continue;
+                        canvas->save();
+                        if (ch->shouldUseTransform()) {
+                            Matrix m2 = ch->getMatrix();
+                            SkMatrix sm;
+                            sm.setAll(
+                                SkDoubleToScalar(m2.getA()), SkDoubleToScalar(m2.getC()), SkDoubleToScalar(m2.getTx()),
+                                SkDoubleToScalar(m2.getB()), SkDoubleToScalar(m2.getD()), SkDoubleToScalar(m2.getTy()),
+                                SkDoubleToScalar(0.0), SkDoubleToScalar(0.0), SkDoubleToScalar(1.0)
+                            );
+                            canvas->concat(sm);
+                        } else {
+                            canvas->translate(SkDoubleToScalar(ch->getX()), SkDoubleToScalar(ch->getY()));
+                        }
+                        canvas->translate(SkDoubleToScalar(-ch->getAnchorOffsetX()), SkDoubleToScalar(-ch->getAnchorOffsetY()));
+                        if (ch->getAlpha() < 1.0) {
+                            canvas->saveLayerAlpha(nullptr, static_cast<U8CPU>(ch->getAlpha() * 255));
+                        }
+                        calls += renderRaw(ch);
+                        canvas->restore();
+                    }
+                }
+                return calls;
+            };
+
+            // ScrollRect：裁剪并平移
+            if (hasScroll) {
+                SkRect r = SkRect::MakeXYWH(
+                    SkDoubleToScalar(scrollRect->getX()),
+                    SkDoubleToScalar(scrollRect->getY()),
+                    SkDoubleToScalar(scrollRect->getWidth()),
+                    SkDoubleToScalar(scrollRect->getHeight())
+                );
+                canvas->clipRect(r, SkClipOp::kIntersect, true);
+                canvas->translate(SkDoubleToScalar(-scrollRect->getX()), SkDoubleToScalar(-scrollRect->getY()));
+            }
+
+            if (hasMask) {
+                // Layer L1：绘制内容
+                canvas->saveLayer(nullptr, nullptr);
+                drawCalls += renderRaw(displayObject);
+
+                // Layer L2 (DstIn)：绘制遮罩
+                SkPaint pm; pm.setBlendMode(SkBlendMode::kDstIn);
+                canvas->saveLayer(nullptr, &pm);
+
+                // 计算mask→object 的相对矩阵
+                Matrix* maskCM = maskObj->getConcatenatedMatrix();
+                Matrix* objCM = displayObject->getConcatenatedMatrix();
+                Matrix rel = objCM->invert();
+                rel.appendMatrix(*maskCM);
+                SkMatrix m;
+                m.setAll(
+                    SkDoubleToScalar(rel.getA()), SkDoubleToScalar(rel.getC()), SkDoubleToScalar(rel.getTx()),
+                    SkDoubleToScalar(rel.getB()), SkDoubleToScalar(rel.getD()), SkDoubleToScalar(rel.getTy()),
+                    SkDoubleToScalar(0.0), SkDoubleToScalar(0.0), SkDoubleToScalar(1.0)
+                );
+                canvas->save();
+                canvas->concat(m);
+                // 绘制遮罩对象（任意DisplayObject），其alpha将作为蒙版
+                drawCalls += renderRaw(maskObj);
+                canvas->restore();
+
+                canvas->restore(); // 结束L2，应用DstIn
+                canvas->restore(); // 结束L1，提交内容
+            } else {
+                // 无遮罩：仅按scrollRect裁剪后渲染内容
+                drawCalls += renderRaw(displayObject);
+                canvas->restore();
+            }
+            return drawCalls;
+        }
+
+        // 普通路径：渲染当前对象的RenderNode
         if (node) {
             EGRET_DEBUG("RenderNode begin");
             canvas->save();
             canvas->translate(SkDoubleToScalar(offsetX), SkDoubleToScalar(offsetY));
-            
             int nodeDrawCalls = renderNode(node, canvas, false);
             EGRET_DEBUGF("RenderNode drawCalls={}", nodeDrawCalls);
             drawCalls += nodeDrawCalls;
-            
             canvas->restore();
         }
         
@@ -317,7 +430,7 @@ namespace sys {
                 drawCalls = renderMesh(static_cast<MeshNode*>(node), canvas);
                 break;
             case RenderNodeType::NormalBitmapNode:
-                drawCalls = renderBitmap(static_cast<BitmapNode*>(node), canvas);
+                drawCalls = renderNormalBitmap(static_cast<NormalBitmapNode*>(node), canvas);
                 break;
         }
         
@@ -329,17 +442,11 @@ namespace sys {
             return 0;
         }
         
-        // 获取图像数据
-        void* imageData = node->getImage();
-        if (!imageData) {
+        // 从 BitmapNode 的 image 字段获取 BitmapData
+        BitmapData* bmpDataPtr = reinterpret_cast<BitmapData*>(node->getImage());
+        if (!bmpDataPtr) {
             return 0;
         }
-        
-        // TODO: 将imageData转换为SkImage
-        // SkImage* skImage = static_cast<SkImage*>(imageData);
-        // if (!skImage) {
-        //     return 0;
-        // }
         
         SkPaint paint;
         setupPaint(paint);
@@ -360,11 +467,114 @@ namespace sys {
             SkDoubleToScalar(drawData[4]), SkDoubleToScalar(drawData[5]),
             SkDoubleToScalar(drawData[6]), SkDoubleToScalar(drawData[7])
         );
-        
-        // TODO: 使用Skia绘制图像
-        // canvas->drawImageRect(skImage, srcRect, dstRect, &paint);
-        
+
+        // 从缓存或像素构造SkImage
+        sk_sp<SkImage> image = getOrCreateSkImage(bmpDataPtr);
+        if (!image) {
+            return 0;
+        }
+
+        // 平滑采样设置（BitmapNode 公有字段 smoothing）
+        SkSamplingOptions sampling(node->smoothing ? SkFilterMode::kLinear : SkFilterMode::kNearest);
+
+        // 绘制子区域到目标区域
+        canvas->drawImageRect(image, srcRect, dstRect, sampling, &paint, SkCanvas::kStrict_SrcRectConstraint);
+
         return 1;
+    }
+
+    int SkiaRenderer::renderNormalBitmap(NormalBitmapNode* node, SkCanvas* canvas) {
+        if (!node || !canvas) {
+            return 0;
+        }
+
+        // 尝试从节点获取BitmapData
+        BitmapData* bmpDataPtr = reinterpret_cast<BitmapData*>(node->getBitmapData());
+        if (!bmpDataPtr) {
+            // 兼容路径：有些节点可能把BitmapData放在image字段
+            bmpDataPtr = reinterpret_cast<BitmapData*>(node->getImage());
+        }
+        if (!bmpDataPtr) {
+            return 0;
+        }
+
+        SkPaint paint;
+        setupPaint(paint);
+
+        // 获取绘制数据
+        const auto& drawData = node->getDrawData();
+        if (drawData.size() < 8) {
+            return 0;
+        }
+
+        // 解析绘制参数：sourceX, sourceY, sourceW, sourceH, drawX, drawY, drawW, drawH
+        SkRect srcRect = SkRect::MakeXYWH(
+            SkDoubleToScalar(drawData[0]), SkDoubleToScalar(drawData[1]),
+            SkDoubleToScalar(drawData[2]), SkDoubleToScalar(drawData[3])
+        );
+
+        SkRect dstRect = SkRect::MakeXYWH(
+            SkDoubleToScalar(drawData[4]), SkDoubleToScalar(drawData[5]),
+            SkDoubleToScalar(drawData[6]), SkDoubleToScalar(drawData[7])
+        );
+
+        // 从缓存或像素构造SkImage
+        sk_sp<SkImage> image = getOrCreateSkImage(bmpDataPtr);
+        if (!image) {
+            return 0;
+        }
+
+        // 平滑采样设置（NormalBitmapNode 提供 isSmooth()）
+        SkSamplingOptions sampling(node->isSmooth() ? SkFilterMode::kLinear : SkFilterMode::kNearest);
+
+        // 绘制子区域到目标区域
+        canvas->drawImageRect(image, srcRect, dstRect, sampling, &paint, SkCanvas::kStrict_SrcRectConstraint);
+
+        return 1;
+    }
+
+    // ========== 辅助：获取或构建SkImage缓存 ==========
+    sk_sp<SkImage> SkiaRenderer::getOrCreateSkImage(BitmapData* bmp) {
+        if (!bmp) return nullptr;
+        const void* key = static_cast<const void*>(bmp);
+        auto it = m_imageCache.find(key);
+        if (it != m_imageCache.end() && it->second) {
+            return it->second;
+        }
+
+        int texW = bmp->getWidth();
+        int texH = bmp->getHeight();
+        if (texW <= 0 || texH <= 0) {
+            return nullptr;
+        }
+
+        auto argb = bmp->getPixels(0, 0, texW, texH);
+        if (static_cast<int>(argb.size()) != texW * texH) {
+            return nullptr;
+        }
+
+        std::vector<uint8_t> rgba(static_cast<size_t>(texW) * static_cast<size_t>(texH) * 4);
+        for (int i = 0; i < texW * texH; ++i) {
+            uint32_t p = argb[static_cast<size_t>(i)];
+            uint8_t a = (p >> 24) & 0xFF;
+            uint8_t r = (p >> 16) & 0xFF;
+            uint8_t g = (p >> 8) & 0xFF;
+            uint8_t b = p & 0xFF;
+            // 预乘Alpha
+            rgba[static_cast<size_t>(i) * 4 + 0] = static_cast<uint8_t>((r * a + 127) / 255);
+            rgba[static_cast<size_t>(i) * 4 + 1] = static_cast<uint8_t>((g * a + 127) / 255);
+            rgba[static_cast<size_t>(i) * 4 + 2] = static_cast<uint8_t>((b * a + 127) / 255);
+            rgba[static_cast<size_t>(i) * 4 + 3] = a;
+        }
+
+        SkImageInfo info = SkImageInfo::Make(texW, texH, kRGBA_8888_SkColorType, kPremul_SkAlphaType);
+        size_t rowBytes = static_cast<size_t>(texW) * 4;
+        sk_sp<SkData> data = SkData::MakeWithCopy(rgba.data(), rowBytes * static_cast<size_t>(texH));
+        sk_sp<SkImage> image = SkImages::RasterFromData(info, data, rowBytes);
+        if (image) {
+            m_imageCache[key] = image;
+        }
+        return image;
     }
     
     void SkiaRenderer::renderText(TextNode* node, SkCanvas* canvas) {

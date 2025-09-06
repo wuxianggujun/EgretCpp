@@ -161,9 +161,15 @@ namespace egret
         auto& eventMap = getEventMap(useCapture);
         auto& list = eventMap[type];
 
+        // 正在派发期间，为该类型的监听列表做一次性拷贝，避免边派发边修改产生迭代风险
         if (m_eventDispatcher.notifyLevel != 0)
         {
-            list = eventMap[type];
+            auto& clonedSet = useCapture ? m_eventDispatcher.clonedCaptureTypes : m_eventDispatcher.clonedTypes;
+            if (clonedSet.find(type) == clonedSet.end()) {
+                auto copy = list; // 拷贝一份
+                list = std::move(copy);
+                clonedSet.insert(type);
+            }
         }
 
         insertEventBin(list, type, listener, thisObject, useCapture, priority, dispatchOnce);
@@ -250,6 +256,12 @@ namespace egret
             eventBin.target->removeEventListener(eventBin.type, eventBin.listener, eventBin.thisObject,
                                                  eventBin.useCapture);
             s_onceEventList.pop_back();
+        }
+
+        if (m_eventDispatcher.notifyLevel == 0) {
+            // 一次派发结束，清理克隆标记
+            m_eventDispatcher.clonedTypes.clear();
+            m_eventDispatcher.clonedCaptureTypes.clear();
         }
 
         return !event.isDefaultPrevented();

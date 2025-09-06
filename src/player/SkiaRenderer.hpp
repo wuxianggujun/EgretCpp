@@ -3,11 +3,14 @@
 #include "player/NormalBitmapNode.hpp"
 #include "player/SkiaRenderBuffer.hpp"
 #include <memory>
+#include <unordered_map>
 
-// Skia前向声明
+// Skia前向声明/包含（用于sk_sp缓存）
 class SkCanvas;
 class SkPaint;
 class SkPath;
+#include <include/core/SkRefCnt.h>
+#include <include/core/SkImage.h>
 
 namespace egret {
 namespace sys {
@@ -41,6 +44,11 @@ namespace sys {
          * 清空渲染状态
          */
         void renderClear() override;
+
+        /**
+         * 失效BitmapData对应的SkImage缓存
+         */
+        void invalidateBitmapData(BitmapData* bmp) override;
         
         // ========== Skia特有方法 ==========
         
@@ -91,6 +99,7 @@ namespace sys {
          * @return 绘制调用次数
          */
         int renderBitmap(BitmapNode* node, SkCanvas* canvas);
+        int renderNormalBitmap(NormalBitmapNode* node, SkCanvas* canvas);
         
         /**
          * 渲染文本节点
@@ -179,6 +188,12 @@ namespace sys {
         // Skia资源
         std::unique_ptr<SkPaint> m_defaultPaint;       // 默认画笔
         std::unique_ptr<SkPath> m_tempPath;            // 临时路径对象
+
+        // BitmapData -> SkImage 简易缓存（当前未做脏标记失效，后续可接入BitmapData::invalidate）
+        std::unordered_map<const void*, sk_sp<SkImage>> m_imageCache;
+
+        // 从BitmapData构建或获取缓存的SkImage
+        sk_sp<SkImage> getOrCreateSkImage(class BitmapData* bmp);
         
         // 常量定义
         static constexpr int MAX_BUFFER_POOL_SIZE = 6; // 最大缓冲区池大小

@@ -135,6 +135,23 @@ namespace sys {
          */
         bool hasGradientFill() const { return m_hasGradientFill; }
 
+        // ========== 填充规则与布尔运算 ==========
+        
+        /**
+         * 设置是否使用偶奇填充规则（Even-Odd）。
+         * 当为true时，路径中的“内部子轮廓”将产生空洞效果。
+         */
+        void setFillEvenOdd(bool enabled);
+        bool isFillEvenOdd() const { return m_fillEvenOdd; }
+
+        /**
+         * 与另一路径进行布尔运算（原地修改当前路径）。
+         * @param other 另一条路径
+         * @param op 运算类型（"union"|"intersect"|"difference"|"xor"|"reverse_difference"）
+         * @return 是否成功
+         */
+        bool booleanOp(const Path2D& other, const std::string& op);
+
         // ========== 状态管理 ==========
         
         /**
@@ -196,6 +213,9 @@ namespace sys {
          * 创建渐变着色器
          */
         void createGradientShader();
+
+        // 填充规则
+        bool m_fillEvenOdd = false;
     };
 
 } // namespace sys

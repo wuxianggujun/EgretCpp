@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.31)
-project(BasicWindow LANGUAGES C CXX)
+project(01-BasicWindow LANGUAGES C CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 20)
@@ -13,11 +13,11 @@ get_directory_property(hasParent PARENT_DIRECTORY)
 
 if(hasParent)
     # Building as part of main project - EgretEngine already available
-    message(STATUS "Building BasicWindow as part of main project")
+    message(STATUS "Building 01-BasicWindow as part of main project")
     
 else()
     # Building independently - need to build EgretEngine first
-    message(STATUS "Building BasicWindow independently - including EgretEngine")
+    message(STATUS "Building 01-BasicWindow independently - including EgretEngine")
     
     # Add the main project as subdirectory to get EgretEngine
     add_subdirectory(${EGRET_ROOT} ${CMAKE_BINARY_DIR}/EgretEngine EXCLUDE_FROM_ALL)
@@ -25,10 +25,10 @@ else()
 endif()
 
 # Add executable
-add_executable(basic-window main.cpp)
+add_executable(01-basic-window main.cpp)
 
 # Link to EgretEngine (which already has all dependencies)
-target_link_libraries(basic-window PRIVATE EgretEngine)
+target_link_libraries(01-basic-window PRIVATE EgretEngine)
 
 # Include EgretCpp source directories
-target_include_directories(basic-window PRIVATE ${EGRET_ROOT}/src)
+target_include_directories(01-basic-window PRIVATE ${EGRET_ROOT}/src)

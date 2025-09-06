@@ -222,6 +222,12 @@ namespace egret {
          */
         DisplayObject* hitTest(double stageX, double stageY);
 
+        // ========== 填充规则 ==========
+        /**
+         * 设置当前及后续 beginFill 创建的路径为 Even-Odd 填充规则（空心支持）
+         */
+        void setFillEvenOdd(bool enabled) { m_fillEvenOddFlag = enabled; }
+
         // ========== 内部系统方法 ==========
         
         /**
@@ -320,6 +326,7 @@ namespace egret {
         double m_lastY = 0.0;                             // 当前y坐标
         std::shared_ptr<sys::Path2D> m_fillPath;          // 当前正在绘制的填充路径
         std::shared_ptr<sys::StrokePath> m_strokePath;    // 当前正在绘制的线条路径
+        bool m_fillEvenOddFlag = false;                   // 是否使用Even-Odd填充规则
 
         // 线条宽度处理
         double m_topLeftStrokeWidth = 0.0;                // 线条左上方宽度

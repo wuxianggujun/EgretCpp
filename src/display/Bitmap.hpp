@@ -164,6 +164,12 @@ namespace egret
         void setImageData(std::shared_ptr<BitmapData> bitmapData, double bitmapX, double bitmapY, 
                          double bitmapWidth, double bitmapHeight, double offsetX, double offsetY,
                          double textureWidth, double textureHeight, double sourceWidth, double sourceHeight);
+
+        /**
+         * 为渲染准备渲染节点数据（在渲染前调用）
+         * 根据当前纹理、scale9Grid、显式尺寸等，更新 NormalBitmapNode 的 drawData。
+         */
+        void prepareRenderNode();
         
     protected:
         // ========== DisplayObject虚函数重写 ==========

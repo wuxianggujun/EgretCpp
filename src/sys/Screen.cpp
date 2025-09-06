@@ -1,4 +1,5 @@
 #include "sys/Screen.hpp"
+#include "player/Player.hpp"
 #include "display/Stage.hpp"
 #include "geom/Matrix.hpp"
 #include <glm/gtc/constants.hpp>
@@ -200,7 +201,8 @@ namespace sys {
 
     void Screen::updatePlayerSize(double width, double height) {
         if (m_player) {
-            // m_player->updateStageSize(width, height);
+            // 通知播放器更新舞台尺寸（含RenderBuffer/DisplayList同步）
+            m_player->updateStageSize(static_cast<int>(std::round(width)), static_cast<int>(std::round(height)));
         }
         
         // 更新舞台尺寸

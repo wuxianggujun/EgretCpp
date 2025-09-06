@@ -3,7 +3,9 @@
 #include "events/Event.hpp"
 #include "events/KeyboardEvent.hpp"
 #include "events/Keyboard.hpp"
+#include "sys/Screen.hpp"
 #include <iostream>
+#include <cmath>
 #include "utils/Logger.hpp"
 
 namespace egret {
@@ -170,13 +172,10 @@ namespace platform {
                 // 同步舞台与渲染缓冲尺寸
                 int newWidth = sdlEvent.window.data1;
                 int newHeight = sdlEvent.window.data2;
-                // 统一调用Stage::resize以确保DisplayList的RenderBuffer同步调整
+                // 统一调用Stage::resize（内部优先委托Screen处理，并在其中派发RESIZE事件）
                 m_stage->resize(newWidth, newHeight);
-
-                // 派发RESIZE事件
-                event = std::make_shared<Event>(Event::RESIZE);
                 EGRET_INFOF("窗口Resize事件: {}x{}", newWidth, newHeight);
-                break;
+                return true; // 已处理
             }
                 
             case SDL_EVENT_WINDOW_FOCUS_GAINED:
@@ -208,10 +207,52 @@ namespace platform {
     }
     
     void SDLEventConverter::convertCoordinates(float& x, float& y) const {
-        // 在这里可以添加坐标系转换逻辑
-        // 比如处理不同的缩放模式、DPI缩放等
-        // 暂时保持原样
-        // TODO
+        if (!m_stage) return;
+        auto screen = m_stage->getScreen();
+        if (!screen) return;
+
+        // 读取Screen的显示尺寸与窗口边界
+        double displayW = screen->getDisplayWidth();
+        double displayH = screen->getDisplayHeight();
+        double windowW = screen->getBoundingClientWidth();
+        double windowH = screen->getBoundingClientHeight();
+        double stageW = screen->getCanvasWidth();   // 画布（舞台坐标系）宽度
+        double stageH = screen->getCanvasHeight();  // 画布（舞台坐标系）高度
+
+        if (displayW <= 0 || displayH <= 0 || stageW <= 0 || stageH <= 0) {
+            return;
+        }
+
+        // 计算letterbox居中偏移
+        double offX = (windowW - displayW) * 0.5;
+        double offY = (windowH - displayH) * 0.5;
+
+        // 将窗口像素坐标先转换到显示区域局部坐标（去掉letterbox）
+        double lx = static_cast<double>(x) - offX;
+        double ly = static_cast<double>(y) - offY;
+
+        // 应用屏幕旋转的逆变换（将窗口坐标反旋转回未旋转的显示区域）
+        double rotation = screen->getRotation(); // 单位：度，可能为±90或0
+        if (std::abs(rotation) > 0.01) {
+            double cx = displayW * 0.5;
+            double cy = displayH * 0.5;
+            double dx = lx - cx;
+            double dy = ly - cy;
+            const double PI = 3.14159265358979323846;
+            double rad = -rotation * PI / 180.0; // 逆旋转
+            double cosr = std::cos(rad);
+            double sinr = std::sin(rad);
+            double rx = dx * cosr - dy * sinr;
+            double ry = dx * sinr + dy * cosr;
+            lx = rx + cx;
+            ly = ry + cy;
+        }
+
+        // 将显示区域局部坐标映射为舞台坐标
+        double scaleX = stageW / displayW;
+        double scaleY = stageH / displayH;
+        x = static_cast<float>(lx * scaleX);
+        y = static_cast<float>(ly * scaleY);
     }
 
 } // namespace platform

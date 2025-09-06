@@ -6,6 +6,7 @@
 #include "display/DisplayList.hpp"
 #include "events/Event.hpp"
 #include "utils/Logger.hpp"
+#include "sys/Screen.hpp"
 #include <iostream>
 #include <chrono>
 #include <thread>
@@ -110,6 +111,27 @@ namespace sys {
         
         // 创建屏幕显示列表
         m_screenDisplayList = createDisplayList(m_stage, renderBuffer);
+
+        // 创建并初始化屏幕适配器（按舞台当前配置 + 初始窗口尺寸）
+        m_screen = std::make_unique<sys::Screen>();
+        m_screen->setStage(m_stage.get());
+        m_screen->setDisplayList(m_screenDisplayList.get());
+        m_screen->setPlayer(this);
+        m_stage->setScreen(m_screen.get());
+        {
+            sys::PlayerOptions opts;
+            opts.scaleMode = m_stage->getScaleMode();
+            opts.orientation = m_stage->getOrientation();
+            opts.maxTouches = m_stage->getMaxTouches();
+            opts.frameRate = m_stage->getFrameRate();
+            opts.textureScaleFactor = m_stage->getTextureScaleFactor();
+            opts.contentWidth = static_cast<double>(width);
+            opts.contentHeight = static_cast<double>(height);
+            opts.showFPS = m_showFPS;
+            opts.showLog = m_showLog;
+            opts.entryClassName = m_entryClassName;
+            m_screen->initialize(opts);
+        }
         
         // 创建事件转换器
         m_eventConverter = std::make_shared<platform::SDLEventConverter>(m_stage);
@@ -134,6 +156,29 @@ namespace sys {
         
         // 创建屏幕显示列表
         m_screenDisplayList = createDisplayList(stage, buffer);
+
+        // 创建并初始化屏幕适配器（按舞台当前配置 + 缓冲/舞台尺寸）
+        int initW = static_cast<int>(buffer->getWidth() > 0 ? buffer->getWidth() : stage->getStageWidth());
+        int initH = static_cast<int>(buffer->getHeight() > 0 ? buffer->getHeight() : stage->getStageHeight());
+        m_screen = std::make_unique<sys::Screen>();
+        m_screen->setStage(m_stage.get());
+        m_screen->setDisplayList(m_screenDisplayList.get());
+        m_screen->setPlayer(this);
+        m_stage->setScreen(m_screen.get());
+        {
+            sys::PlayerOptions opts;
+            opts.scaleMode = m_stage->getScaleMode();
+            opts.orientation = m_stage->getOrientation();
+            opts.maxTouches = m_stage->getMaxTouches();
+            opts.frameRate = m_stage->getFrameRate();
+            opts.textureScaleFactor = m_stage->getTextureScaleFactor();
+            opts.contentWidth = static_cast<double>(initW);
+            opts.contentHeight = static_cast<double>(initH);
+            opts.showFPS = m_showFPS;
+            opts.showLog = m_showLog;
+            opts.entryClassName = m_entryClassName;
+            m_screen->initialize(opts);
+        }
     }
     
     Player::~Player() {
@@ -258,20 +303,21 @@ namespace sys {
             return;
         }
         
-        // 更新舞台尺寸
-        m_stage->setStageWidth(stageWidth);
-        m_stage->setStageHeight(stageHeight);
+        // 更新舞台尺寸（内部坐标系尺寸）
+        m_stage->setStageWidthInternal(stageWidth);
+        m_stage->setStageHeightInternal(stageHeight);
         
         // TODO: 实现原生渲染支持
         // if (egret.nativeRender) {
         //     egret_native.nrResize(stageWidth, stageHeight);
         // } else {
+            // 同步显示列表与渲染缓冲尺寸为舞台尺寸
             m_screenDisplayList->setClipRect(stageWidth, stageHeight);
+            if (auto rb = m_screenDisplayList->getRenderBuffer()) {
+                rb->resize(stageWidth, stageHeight);
+            }
         // }
-        
-        // 派发resize事件
-        auto resizeEvent = std::make_shared<Event>(Event::RESIZE);
-        m_stage->dispatchEvent(*resizeEvent);
+        // 由窗口事件转换器派发RESIZE事件即可，这里不重复派发
         
         EGRET_INFOF("Stage size updated to: {}x{}", stageWidth, stageHeight);
     }
@@ -357,9 +403,29 @@ namespace sys {
                             if (surface && surface->readPixels(info, pixels.data(), texW * 4, 0, 0)) {
                                 // 更新SDL纹理并绘制到窗口
                                 SDL_UpdateTexture(m_presentTexture, nullptr, pixels.data(), texW * 4);
-                                // SDL3渲染：渲染整张纹理到目标
+                                // SDL3渲染：按Screen显示尺寸缩放并居中
                                 SDL_FRect dstRect{0.0f, 0.0f, static_cast<float>(texW), static_cast<float>(texH)};
-                                SDL_RenderTexture(m_sdlWindow->getRenderer(), m_presentTexture, nullptr, &dstRect);
+                                if (m_screen) {
+                                    // 目标显示尺寸（displayWidth/Height），并在窗口中居中
+                                    float dW = static_cast<float>(m_screen->getDisplayWidth());
+                                    float dH = static_cast<float>(m_screen->getDisplayHeight());
+                                    int winW = 0, winH = 0;
+                                    m_sdlWindow->getSize(winW, winH);
+                                    float offX = (static_cast<float>(winW) - dW) * 0.5f;
+                                    float offY = (static_cast<float>(winH) - dH) * 0.5f;
+                                    dstRect = SDL_FRect{offX, offY, dW, dH};
+                                }
+                                // SDL3旋转呈现，按Screen旋转角度对齐方向语义
+                                double angle = 0.0;
+                                if (m_screen) {
+                                    angle = m_screen->getRotation(); // 0 / 90 / -90
+                                }
+                                if (angle == 0.0) {
+                                    SDL_RenderTexture(m_sdlWindow->getRenderer(), m_presentTexture, nullptr, &dstRect);
+                                } else {
+                                    SDL_FPoint center{ dstRect.x + dstRect.w * 0.5f, dstRect.y + dstRect.h * 0.5f };
+                                    SDL_RenderTextureRotated(m_sdlWindow->getRenderer(), m_presentTexture, nullptr, &dstRect, angle, &center, SDL_FLIP_NONE);
+                                }
                             }
                         }
                     }

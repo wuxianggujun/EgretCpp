@@ -9,6 +9,8 @@
 // Skia includes
 #include <include/core/SkPath.h>
 #include <include/core/SkPaint.h>
+#include <include/core/SkPathTypes.h>
+#include <include/pathops/SkPathOps.h>
 #include <include/effects/SkGradientShader.h>
 #include <include/core/SkMatrix.h>
 
@@ -193,6 +195,33 @@ namespace sys {
     
     bool Path2D::isEmpty() const {
         return m_skiaPath->isEmpty();
+    }
+
+    void Path2D::setFillEvenOdd(bool enabled) {
+        m_fillEvenOdd = enabled;
+        if (m_skiaPath) {
+            m_skiaPath->setFillType(enabled ? SkPathFillType::kEvenOdd : SkPathFillType::kWinding);
+        }
+    }
+
+    bool Path2D::booleanOp(const Path2D& other, const std::string& op) {
+        if (!m_skiaPath || !other.m_skiaPath) return false;
+        SkPath result;
+        SkPathOp skop;
+        if (op == "union") skop = SkPathOp::kUnion_SkPathOp;
+        else if (op == "intersect") skop = SkPathOp::kIntersect_SkPathOp;
+        else if (op == "difference") skop = SkPathOp::kDifference_SkPathOp;
+        else if (op == "xor") skop = SkPathOp::kXOR_SkPathOp;
+        else if (op == "reverse_difference") skop = SkPathOp::kReverseDifference_SkPathOp;
+        else return false;
+
+        bool ok = Op(*m_skiaPath, *other.m_skiaPath, skop, &result);
+        if (ok) {
+            *m_skiaPath = result;
+            // 维持当前填充规则设置
+            m_skiaPath->setFillType(m_fillEvenOdd ? SkPathFillType::kEvenOdd : SkPathFillType::kWinding);
+        }
+        return ok;
     }
 
     // ========== 私有辅助方法 ==========
